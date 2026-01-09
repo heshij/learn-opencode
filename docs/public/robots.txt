@@ -1,0 +1,13 @@
+# OpenCode 中文教程 - robots.txt
+# https://learnopencode.com
+
+User-agent: *
+Allow: /
+
+# 站点地图
+Sitemap: https://learnopencode.com/sitemap.xml
+
+# 禁止抓取缓存和临时文件
+Disallow: /.vitepress/
+Disallow: /assets/*.js$
+Disallow: /assets/*.css$

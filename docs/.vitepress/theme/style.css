@@ -1,0 +1,380 @@
+/**
+ * Customize default theme styling by overriding CSS variables:
+ * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
+ */
+
+/**
+ * Colors
+ *
+ * Each colors have exact same color scale system with 3 levels of solid
+ * temporary colors, and 1 soft color.
+ */
+:root {
+  --vp-c-brand-1: #10b981;
+  --vp-c-brand-2: #059669;
+  --vp-c-brand-3: #047857;
+  --vp-c-brand-soft: rgba(16, 185, 129, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #34d399;
+  --vp-c-brand-2: #10b981;
+  --vp-c-brand-3: #059669;
+  --vp-c-brand-soft: rgba(52, 211, 153, 0.14);
+}
+
+/**
+ * Component: Button
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: var(--vp-c-white);
+  --vp-button-brand-bg: var(--vp-c-brand-1);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: var(--vp-c-white);
+  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: var(--vp-c-white);
+  --vp-button-brand-active-bg: var(--vp-c-brand-1);
+}
+
+/**
+ * Component: Home
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    var(--vp-c-brand-1) 30%,
+    #41d1ff
+  );
+
+  /* 去掉发光效果 */
+  --vp-home-hero-image-background-image: none;
+  --vp-home-hero-image-filter: none;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: none;
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: none;
+  }
+}
+
+/**
+ * Component: Custom Block
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-custom-block-tip-border: transparent;
+  --vp-custom-block-tip-text: var(--vp-c-text-1);
+  --vp-custom-block-tip-bg: var(--vp-c-brand-soft);
+  --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
+}
+
+/**
+ * Component: Algolia
+ * -------------------------------------------------------------------------- */
+
+.DocSearch {
+  --docsearch-primary-color: var(--vp-c-brand-1) !important;
+}
+
+/**
+ * Custom styles
+ * -------------------------------------------------------------------------- */
+
+/* kbd 标签样式 */
+kbd {
+  display: inline-block;
+  padding: 0.15em 0.4em;
+  font-size: 0.85em;
+  font-family: var(--vp-font-family-mono);
+  line-height: 1;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--vp-c-divider);
+}
+
+/* 角色卡片样式 */
+.role-cards {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+@media (min-width: 768px) {
+  .role-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.role-cards h3 {
+  margin-top: 0;
+}
+
+/* 表格优化 - 移动端响应式 */
+.vp-doc .table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+  min-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .vp-doc table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  .vp-doc table code {
+    word-break: keep-all;
+    white-space: nowrap;
+  }
+}
+
+.vp-doc th,
+.vp-doc td {
+  padding: 0.75rem 1rem;
+}
+
+@media (max-width: 640px) {
+  .vp-doc th,
+  .vp-doc td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* 学习路线卡片 */
+.learning-paths {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+}
+
+@media (min-width: 640px) {
+  .learning-paths {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .learning-paths {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.path-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+
+.path-card:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.1);
+  transform: translateY(-2px);
+}
+
+.path-card .path-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.path-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.path-card .path-duration {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--vp-c-brand-1);
+}
+
+.path-card .path-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--vp-c-text-2);
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.path-card .path-cta {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--vp-c-brand-1);
+}
+
+/* 数据统计网格 */
+.stats-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+}
+
+@media (min-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+  text-align: center;
+}
+
+.stat-item .stat-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--vp-c-brand-1);
+  line-height: 1;
+}
+
+.stat-item .stat-label {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.stat-item .stat-desc {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+}
+
+/* 目标用户卡片 */
+.audience-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+}
+
+@media (min-width: 640px) {
+  .audience-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.audience-card {
+  padding: 1.5rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+}
+
+.audience-card .audience-icon {
+  font-size: 2rem;
+}
+
+.audience-card h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+.audience-card .audience-pain {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--vp-c-text-2);
+}
+
+.audience-card .audience-solution {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--vp-c-brand-1);
+}
+
+/* 底部 CTA */
+.final-cta {
+  margin: 3rem 0 2rem;
+  padding: 2.5rem;
+  text-align: center;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--vp-c-brand-soft), transparent);
+  border: 1px solid var(--vp-c-brand-1);
+}
+
+.final-cta .cta-highlight {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--vp-c-brand-1);
+}
+
+.final-cta .cta-subtitle {
+  margin: 0.5rem 0 1.5rem;
+  font-size: 1rem;
+  color: var(--vp-c-text-2);
+}
+
+.final-cta .cta-button {
+  display: inline-block;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: var(--vp-c-brand-1);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.25s ease;
+}
+
+.final-cta .cta-button:hover {
+  background: var(--vp-c-brand-2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/**
+ * 图片放大功能 (medium-zoom)
+ * -------------------------------------------------------------------------- */
+
+/* 确保放大的图片层级最高 */
+.medium-zoom-overlay {
+  z-index: 2000 !important;
+}
+
+.medium-zoom-image--opened {
+  z-index: 2001 !important;
+}

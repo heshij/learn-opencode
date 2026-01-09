@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <rect width="800" height="400" fill="#f0f0f0"/>
+  <rect x="20" y="20" width="760" height="360" rx="10" fill="#e0e0e0" stroke="#ccc" stroke-width="2"/>
+  <text x="400" y="180" font-family="Arial" font-size="24" fill="#888" text-anchor="middle">📹 演示图片占位</text>
+  <text x="400" y="220" font-family="Arial" font-size="16" fill="#aaa" text-anchor="middle">intro-demo</text>
+  <text x="400" y="260" font-family="Arial" font-size="14" fill="#bbb" text-anchor="middle">后续添加实际演示 GIF/视频</text>
+</svg>
