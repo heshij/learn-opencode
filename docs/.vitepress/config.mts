@@ -117,6 +117,7 @@ export default defineConfig({
               { text: 'Claude（Anthropic）', link: '/1-start/04e-claude' },
               { text: 'Claude Code 中转', link: '/1-start/04f-claudecode-relay' },
               { text: 'Ollama（本地）', link: '/1-start/04g-ollama' },
+              { text: 'OpenAI（GPT / Codex）', link: '/1-start/04h-openai' },
               { text: '通义千问', link: '/1-start/04i-alibaba' },
             ]
           },
@@ -292,6 +293,14 @@ export default defineConfig({
           { text: 'I. 生态系统', link: '/appendix/ecosystem' },
           { text: 'J. 迁移指南', link: '/appendix/migration' },
           { text: 'K. OpenCode Zen', link: '/appendix/zen' },
+        ]
+      },
+      {
+        text: '📝 OpenCode 更新日志',
+        collapsed: true,
+        items: [
+          { text: '更新日志', link: '/changelog/' },
+          { text: 'v1.1.11', link: '/changelog/v1.1.11' },
         ]
       },
     ],

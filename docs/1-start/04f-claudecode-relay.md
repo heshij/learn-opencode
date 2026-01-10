@@ -69,6 +69,10 @@ baseURL 的填写规则（常见两种给法）：
       "models": {
         "claude-opus-4-5-20251101": {
           "name": "zhongzhuang",
+          "limit": {
+            "context": 200000,
+            "output": 64000
+          },
           "options": {
             "thinking": {
               "type": "enabled",
@@ -84,10 +88,18 @@ baseURL 的填写规则（常见两种给法）：
 
 说明：
 
-- `npm` 用来告诉 OpenCode：这个 provider 要按哪种“协议/SDK 驱动”发请求。Claude/Anthropic 兼容中转一般要用 `@ai-sdk/anthropic`；如果你删掉这行，OpenCode 可能会按默认的 OpenAI-compatible 方式去理解这个 provider，从而请求失败。
-- 你也可以直接改 `provider.anthropic` 来走中转；那种写法本质上同样是在走 Anthropic 这套协议，但不建议（原因见文末“补充说明”）。
-- `claude-opus-4-5-20251101` 会作为你在 OpenCode 里看到的“模型 ID”，在 `/models` 里显示成 `claudecode-relay/claude-opus-4-5-20251101`
+- `npm` 用来告诉 OpenCode：这个 provider 要按哪种"协议/SDK 驱动"发请求。Claude/Anthropic 兼容中转一般要用 `@ai-sdk/anthropic`；如果你删掉这行，OpenCode 可能会按默认的 OpenAI-compatible 方式去理解这个 provider，从而请求失败。
+- 你也可以直接改 `provider.anthropic` 来走中转；那种写法本质上同样是在走 Anthropic 这套协议，但不建议（原因见文末"补充说明"）。
+- `claude-opus-4-5-20251101` 会作为你在 OpenCode 里看到的"模型 ID"，在 `/models` 里显示成 `claudecode-relay/claude-opus-4-5-20251101`
 - `models.<id>.name` 需要替换成中转商要求的模型名（本章用 `zhongzhuang` 作为教学占位）
+- `limit.context` 和 `limit.output` 定义模型的上下文窗口和最大输出长度。**如果不配置，默认值为 0，会导致自动压缩功能失效**。推荐值见下表。
+
+| 模型 | context | output |
+|-----|---------|--------|
+| claude-opus-4-5 | 200000 | 64000 |
+| claude-sonnet-4-5 | 200000 | 64000 |
+
+> 💡 想深入了解上下文压缩机制和 `limit` 参数的作用？请参阅 [5.20 上下文压缩](/5-advanced/20-compaction)。
 
 ---
 

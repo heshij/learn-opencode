@@ -372,16 +372,16 @@ Compaction Agent 使用的 prompt 是固定的。如果你发现压缩质量不�
 
 | 功能 | 文件路径 | 行号 |
 |-----|---------|------|
-| 压缩核心逻辑 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/session/compaction.ts) | 全文件 |
-| 自动触发判断 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/session/compaction.ts#L30-L39) | 30-39 |
-| Prune 裁剪逻辑 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/session/compaction.ts#L49-L90) | 49-90 |
-| Context 百分比计算 | [`src/cli/cmd/tui/routes/session/sidebar.tsx`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx#L51-L61) | 51-61 |
-| 压缩配置项 | [`src/config/config.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/config/config.ts#L927-L932) | 927-932 |
-| 模型 limit Schema | [`src/provider/provider.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/provider/provider.ts#L498-L501) | 498-501 |
-| 用户自定义 limit | [`src/provider/provider.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/provider/provider.ts#L722-L724) | 722-724 |
-| OUTPUT_TOKEN_MAX | [`src/session/prompt.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/session/prompt.ts#L53) | 53 |
-| Compaction Agent | [`src/agent/agent.ts`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/agent/agent.ts#L122-L136) | 122-136 |
-| Compaction Prompt | [`src/agent/prompt/compaction.txt`](https://github.com/anomalyco/opencode/tree/main/packages/opencode/src/agent/prompt/compaction.txt) | 全文件 |
+| 压缩核心逻辑 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/compaction.ts) | 全文件 |
+| 自动触发判断 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/compaction.ts#L30-L39) | 30-39 |
+| Prune 裁剪逻辑 | [`src/session/compaction.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/compaction.ts#L49-L90) | 49-90 |
+| Context 百分比计算 | [`src/cli/cmd/tui/routes/session/sidebar.tsx`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/tui/routes/session/sidebar.tsx#L51-L61) | 51-61 |
+| 压缩配置项 | [`src/config/config.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/config/config.ts#L927-L932) | 927-932 |
+| 模型 limit Schema | [`src/provider/provider.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/provider/provider.ts#L498-L501) | 498-501 |
+| 用户自定义 limit | [`src/provider/provider.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/provider/provider.ts#L722-L724) | 722-724 |
+| OUTPUT_TOKEN_MAX | [`src/session/prompt.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/prompt.ts#L53) | 53 |
+| Compaction Agent | [`src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L122-L136) | 122-136 |
+| Compaction Prompt | [`src/agent/prompt/compaction.txt`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/prompt/compaction.txt) | 全文件 |
 
 **关键常量**：
 - `OUTPUT_TOKEN_MAX = 32,000`：最大输出预留空间
