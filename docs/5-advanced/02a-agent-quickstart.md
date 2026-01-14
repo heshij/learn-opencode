@@ -215,29 +215,58 @@ temperature: 0.3
 - 如果遇到不熟悉的框架，声明并建议其他 Agent
 ```
 
-### Frontmatter 字段速查表
+### Markdown 中的权限配置
 
-| 字段 | 类型 | 必填 | 说明 |
-|-----|------|-----|------|
-| `description` | string | 建议填 | Agent 简介，影响自动选择 |
-| `mode` | `primary` \| `subagent` \| `all` | 否 | 默认 `all` |
-| `model` | string | 否 | 格式：`provider/model` |
-| `temperature` | number | 否 | 0-1，控制创造性 |
-| `top_p` | number | 否 | 0-1，核采样参数 |
-| `steps` | number | 否 | 最大迭代步数 |
-| `hidden` | boolean | 否 | 从 @ 菜单隐藏（仅 subagent） |
-| `color` | string | 否 | 十六进制颜色，如 `#FF5733` |
-| `permission` | object | 否 | 权限配置，详见 [5.2c](./02c-agent-permissions) |
+你可以在 Frontmatter 中直接配置权限（使用 YAML 语法）：
+
+```markdown
+---
+description: 只读代码审计 Agent
+mode: subagent
+permission:
+  edit: deny            # 禁止编辑
+  bash:
+    "*": deny           # 禁止所有命令
+    "git log*": allow   # 只允许查看日志
+  task:
+    "*": deny           # 禁止调用其他 Agent
+---
+```
+
+### 完整配置字段速查表
+
+| 字段 | 类型 | 说明 |
+|-----|------|------|
+| `description` | string | **建议填**。Agent 简介，影响主 Agent 的自动选择决策 |
+| `mode` | enum | `subagent` \| `primary` \| `all`。默认 `all` |
+| `model` | string | 格式 `provider/model`。不填则继承主 Agent 当前模型 |
+| `prompt` | string | 系统提示词（JSON 配置专用，Markdown 中使用正文） |
+| `temperature` | number | 0-1，控制回答的随机性 |
+| `top_p` | number | 0-1，核采样参数 |
+| `steps` | number | 最大迭代步数，防止死循环 |
+| `hidden` | boolean | `true` 则从 @ 自动补全菜单中隐藏 |
+| `color` | string | 十六进制颜色 `#RRGGBB`，用于界面区分 |
+| `permission` | object | 权限配置对象 |
+| `disable` | boolean | 是否禁用此 Agent |
+| `options` | object | 透传参数容器，用于存放不常用的 Provider 参数 |
+| *其他字段* | any | 未知字段会自动作为参数**透传**给 Provider（如 `reasoningEffort`） |
 
 > `maxSteps` 已废弃，请使用 `steps`。
-> 
-> 来源：`config.ts:484`
 
 ---
 
 ## 创建第一个 Agent（JSON 方式）
 
-在 `opencode.json` 中配置：
+在 `opencode.json` 中配置。这与 Markdown 方式等效，适合配置简单的 Agent 或进行覆盖配置。
+
+### 配置合并规则
+
+你可以混合使用 Markdown 和 JSON。如果同名 Agent 存在于两处，规则如下：
+
+1. **JSON 配置优先级更高**：`opencode.json` 中的字段会覆盖 `.md` 中的同名字段。
+2. **场景**：通常用 `.md` 定义 Prompt（因为长文本好写），用 `opencode.json` 微调参数（如临时禁用、修改模型）。
+
+### JSON 配置示例
 
 ```jsonc
 {
