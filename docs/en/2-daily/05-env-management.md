@@ -147,7 +147,7 @@ Run:
 opencode stats
 ```
 
-You'll see a detailed dashboard. Here's real data after one month of use:
+You'll see a detailed dashboard. The example below shows one month of usage; the tool section uses `--tools 7` to keep the output short:
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -163,9 +163,12 @@ You'll see a detailed dashboard. Here's real data after one month of use:
 ├────────────────────────────────────────────────────────┤
 │Total Cost                                    $1232.56 │
 │Avg Cost/Day                                    $42.50 │
+│Avg Tokens/Session                                 1.3M │
+│Median Tokens/Session                            112.8K │
 │Input                                           530.6M │
 │Output                                            9.9M │
 │Cache Read                                      703.0M │
+│Cache Write                                       6.2M │
 └────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────┐
@@ -174,6 +177,10 @@ You'll see a detailed dashboard. Here's real data after one month of use:
 │ read               ████████████████████ 7270 (34.3%)   │
 │ bash               ███████████          4074 (19.2%)   │
 │ edit               ████████             3007 (14.2%)   │
+│ write              ████                  1785 ( 8.4%)   │
+│ glob               ███                   1263 ( 6.0%)   │
+│ task               ██                    1023 ( 4.8%)   │
+│ grep               ██                     892 ( 4.2%)   │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -182,18 +189,20 @@ You'll see a detailed dashboard. Here's real data after one month of use:
 For beginners, focus on these numbers:
 
 1. **Total Cost**: Estimated cost in USD. OpenCode calculates based on each provider's public pricing.
-2. **Input vs Output**:
+2. **Avg / Median Tokens/Session**:
+   - `Avg` (Average): Average token consumption across all sessions.
+   - `Median`: Middle value when sorted by consumption. If some sessions are extremely "token-heavy", the median will be much lower than the average, better reflecting "normal" usage levels.
+3. **Input vs Output**:
    - `Input`: Content you send to AI + file content AI reads. Large volume but cheap.
    - `Output`: Code and responses AI writes. Small volume but expensive.
-3. **Cache Read (Context Cache)**: 🔥 **Key money-saving metric**!
-   - This is money OpenCode saved for you.
-   - When you have continuous conversations, repeated file content gets cached.
-   - `703.0M` means 700 million tokens were read from cache (usually 1/10 of input cost), significantly reducing usage costs.
-
-4. **Tool Usage**:
+4. **Cache Read / Cache Write (Context Cache)**:
+   - **Cache Read**: Cache-read tokens reported by the provider. Whether they are billed and at what rate depends on the model and provider configuration.
+   - **Cache Write**: Cache-write tokens reported by the provider. Billing and rates likewise depend on the model and provider configuration.
+5. **Tool Usage**:
    - Shows which tools AI uses most.
    - `read` (reading files) usually ranks first, showing AI is working to understand your code.
    - `bash` (running commands) and `edit` (modifying code) are also primary tools.
+   - Too many tools listed? Use `--tools 5` to see only the top 5 (see the "Trim Output" section below).
 
 ### Advanced: Project-Specific Statistics (Requires Git)
 
@@ -287,25 +296,46 @@ So, checking this statistics regularly can help you optimize your model combinat
 
 ### Advanced Tip: View Recent Usage Only
 
-By default, `stats` shows cumulative historical totals. But you might care more: "How much did I spend today?" or "How much did that new model cost me this week?"
+By default, `stats` shows cumulative historical totals. You can also restrict the report to recently active sessions:
 
 Use the `--days` flag to specify the number of days:
 
 ```bash
-# Only show statistics for the past 24 hours
+# Include sessions updated since local midnight
+opencode stats --days 0
+
+# Include sessions updated during the past 24 hours
 opencode stats --days 1
 
-# View the last 7 days
+# Include sessions updated during the last 7 days
 opencode stats --days 7
 ```
 
+::: warning `--days` is not an incremental bill
+This flag filters sessions by their last update time, then sums each matching session's complete accumulated usage. `--days 0` is not “usage added today,” and `--days 1` is not a strict 24-hour usage delta.
+:::
+
 **🔥 Power Combo**:
 
-Combine "time limit" and "model statistics" to precisely identify recent "big spenders":
+Combine the active-session filter with model statistics to see which models were used by sessions updated today:
 
 ```bash
-# See who's spending money today (list model consumption for past 24 hours)
-opencode stats --days 1 --models
+# Show complete model totals for sessions updated since local midnight
+opencode stats --days 0 --models
+```
+
+### Trim Output: Show Only Top Tools
+
+By default, `stats` lists every tool you've ever used. Over time, this list gets very long.
+
+Use `--tools` to show only the top N:
+
+```bash
+# Show only the top 5 most-used tools
+opencode stats --tools 5
+
+# Combine with time filter: top 3 tools in the last 7 days
+opencode stats --days 7 --tools 3
 ```
 
 ---
@@ -376,6 +406,8 @@ The `/models` command in TUI not only shows models but also **directly switches*
 
 - [ ] Run `opencode models` to confirm you see your configured models
 - [ ] Run `opencode stats` to glance at your token usage (is it less than you imagined?)
+- [ ] Run `opencode stats --tools 5` to see only the top 5 tools
+- [ ] Run `opencode stats --days 0` to inspect sessions updated today
 - [ ] Run `opencode auth list` to clean up old credentials you don't need
 
 ---
@@ -385,12 +417,12 @@ The `/models` command in TUI not only shows models but also **directly switches*
 <details>
 <summary><strong>Click to expand and view source code locations</strong></summary>
 
-> Last updated: 2026-01-19
+> Last updated: 2026-08-24
 
 | Feature | File Path | Lines |
 | ------- | --------- | ----- |
 | **View Models** | [`src/cli/cmd/models.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/models.ts) | Entire file |
-| **Statistics Logic** | [`src/cli/cmd/stats.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/stats.ts) | 107-301 |
+| **Statistics Logic** | [`src/cli/cmd/stats.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/stats.ts) | Flags 49-80; time filter 88-122; token aggregation and output 161-393 |
 | **Project ID Recognition** | [`src/project/project.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/project/project.ts) | 50-170 |
 | **Auth List** | [`src/cli/cmd/auth.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/auth.ts) | 170-215 |
 | **Auth Storage** | [`src/auth/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/auth/index.ts) | 38-73 |
@@ -411,7 +443,7 @@ The `/models` command in TUI not only shows models but also **directly switches*
    - By default (when `projectFilter` is undefined), all sessions are counted.
    - Only when `--project ""` is explicitly passed, it calls `getCurrentProject()` to get the current directory ID and filters.
 
-3. **Credential Storage (`auth/index.ts`)**:
+4. **Credential Storage (`auth/index.ts`)**:
    - Credentials are stored in `~/.local/share/opencode/auth.json`.
    - Code uses `JSON.stringify` directly for writing, unencrypted.
    - Only file permission `0o600` (current user read/write only) is set as a security measure.

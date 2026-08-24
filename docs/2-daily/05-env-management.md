@@ -147,7 +147,7 @@ OpenCode 内置了一个漂亮的统计面板。
 opencode stats
 ```
 
-你会看到一个详细的仪表盘。这是我使用了一个月后的真实数据：
+你会看到一个详细的仪表盘。下面是使用一个月后的示例数据；为便于展示，工具区使用 `--tools 7` 只列出前 7 项：
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -163,9 +163,12 @@ opencode stats
 ├────────────────────────────────────────────────────────┤
 │Total Cost                                    $1232.56 │
 │Avg Cost/Day                                    $42.50 │
+│Avg Tokens/Session                                 1.3M │
+│Median Tokens/Session                            112.8K │
 │Input                                           530.6M │
 │Output                                            9.9M │
 │Cache Read                                      703.0M │
+│Cache Write                                       6.2M │
 └────────────────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────────────────┐
@@ -174,6 +177,10 @@ opencode stats
 │ read               ████████████████████ 7270 (34.3%)   │
 │ bash               ███████████          4074 (19.2%)   │
 │ edit               ████████             3007 (14.2%)   │
+│ write              ████                  1785 ( 8.4%)   │
+│ glob               ███                   1263 ( 6.0%)   │
+│ task               ██                    1023 ( 4.8%)   │
+│ grep               ██                     892 ( 4.2%)   │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -182,18 +189,20 @@ opencode stats
 对于小白来说，只需要关注这几个数字：
 
 1.  **Total Cost**：估算的美元费用。OpenCode 会根据各家厂商的公开定价计算。
-2.  **Input vs Output**：
+2.  **Avg / Median Tokens/Session**：
+    *   `Avg`（平均值）：所有会话的平均 token 消耗。
+    *   `Median`（中位数）：按消耗排序后取中间值。如果有个别会话特别"烧 token"，中位数会比平均值低很多，更能反映"正常使用"的水平。
+3.  **Input vs Output**：
     *   `Input`（输入）：你发给 AI 的内容 + AI 读取的文件内容。量大但便宜。
     *   `Output`（输出）：AI 写的代码和回复。量小但贵。
-3.  **Cache Read (上下文缓存)**：🔥 **核心省钱指标**！
-    *   这是 OpenCode 帮你省下的钱。
-    *   当你连续对话时，重复的文件内容会被缓存。
-    *   `703.0M` 意味着有 7 亿 token 是直接读缓存的（费用通常只有输入的 1/10），大大降低了使用成本。
-
-4.  **Tool Usage**：
+4.  **Cache Read / Cache Write（上下文缓存）**：
+    *   **Cache Read**：提供商报告的缓存读取 Token 数。是否收费及具体单价取决于模型和提供商配置。
+    *   **Cache Write**：提供商报告的缓存写入 Token 数。是否收费及具体单价同样取决于模型和提供商配置。
+5.  **Tool Usage**：
     *   展示了 AI 最爱用什么工具。
     *   `read` (读文件) 通常排第一，说明 AI 在努力理解你的代码。
     *   `bash` (运行命令) 和 `edit` (改代码) 也是主力工具。
+    *   工具太多显示不全？用 `--tools 5` 只看前 5 个（详见下方「精简输出」小节）。
 
 ### 进阶：项目独立统计（需 Git）
 
@@ -287,25 +296,46 @@ opencode stats --models
 
 ### 进阶技巧：只看最近几天的消耗
 
-默认情况下，`stats` 显示的是历史累计总账。但你可能更关心："我今天花了多少？"或者"这周那个新模型烧了我多少钱？"
+默认情况下，`stats` 显示历史累计总账。你也可以只统计最近活跃的会话：
 
 使用 `--days` 参数可以指定天数：
 
 ```bash
-# 只看过去 24 小时的统计
+# 统计今天零点后更新过的会话
+opencode stats --days 0
+
+# 统计过去 24 小时内更新过的会话
 opencode stats --days 1
 
-# 查看最近 7 天
+# 统计最近 7 天内更新过的会话
 opencode stats --days 7
 ```
 
+::: warning `--days` 不是增量账单
+这个参数按会话的最后更新时间筛选，然后汇总命中会话的完整累计数据。`--days 0` 不等于“今天新增的消费”，`--days 1` 也不等于严格的 24 小时消费增量。
+:::
+
 **🔥 强力组合技**：
 
-把“时间限制”和“模型统计”结合起来，就能精准定位近期的"花钱大户"：
+把“活跃会话筛选”和“模型统计”结合起来，可以查看今天更新过的会话主要使用了哪些模型：
 
 ```bash
-# 看看今天到底是谁在花钱（列出过去24小时的模型消耗）
-opencode stats --days 1 --models
+# 查看今天零点后更新过的会话及其完整模型累计数据
+opencode stats --days 0 --models
+```
+
+### 精简输出：只看前几个工具
+
+默认情况下，`stats` 会列出所有用过的工具。用久了之后，这个列表会很长。
+
+用 `--tools` 可以只显示前 N 个：
+
+```bash
+# 只看使用最多的 5 个工具
+opencode stats --tools 5
+
+# 组合使用：看最近 7 天的 Top 3 工具
+opencode stats --days 7 --tools 3
 ```
 
 ---
@@ -376,6 +406,8 @@ TUI 里的 `/models` 命令不仅能看，还能**直接切换**当前会话的�
 
 - [ ] 运行 `opencode models`，确认看到了你配置的模型
 - [ ] 运行 `opencode stats`，看了一眼自己的 Token 消耗（是不是比想象中少？）
+- [ ] 运行 `opencode stats --tools 5`，只看前 5 个工具
+- [ ] 运行 `opencode stats --days 0`，查看今天更新过的会话统计
 - [ ] 运行 `opencode auth list`，清理掉不需要的旧凭证
 
 ---
@@ -385,12 +417,12 @@ TUI 里的 `/models` 命令不仅能看，还能**直接切换**当前会话的�
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-01-19
+> 更新时间：2026-08-24
 
 | 功能 | 文件路径 | 行号 |
 |-----|---------|------|
 | **查看模型** | [`src/cli/cmd/models.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/models.ts) | 全文件 |
-| **统计逻辑** | [`src/cli/cmd/stats.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/stats.ts) | 107-301 |
+| **统计逻辑** | [`src/cli/cmd/stats.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/stats.ts) | 参数 49-80；时间过滤 88-122；Token 聚合与输出 161-393 |
 | **项目 ID 识别** | [`src/project/project.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/project/project.ts) | 50-170 |
 | **Auth 列表** | [`src/cli/cmd/auth.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/auth.ts) | 170-215 |
 | **Auth 存储** | [`src/auth/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/auth/index.ts) | 38-73 |
@@ -411,7 +443,7 @@ TUI 里的 `/models` 命令不仅能看，还能**直接切换**当前会话的�
     *   默认情况下 (`projectFilter` 未定义)，统计所有 Session。
     *   只有显式传入 `--project ""`，才会调用 `getCurrentProject()` 获取当前目录 ID 并过滤。
 
-3.  **凭证存储 (`auth/index.ts`)**：
+4.  **凭证存储 (`auth/index.ts`)**：
     *   凭证存储在 `~/.local/share/opencode/auth.json`。
     *   代码直接使用 `JSON.stringify` 写入，未加密。
     *   仅设置了文件权限 `0o600`（仅当前用户可读写）作为安全措施。
