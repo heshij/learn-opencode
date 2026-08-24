@@ -338,7 +338,7 @@ The complete parameter definition for the Task tool:
 | `description` | string | Yes | Task description (3-5 words), used as sub-session title |
 | `prompt` | string | Yes | Task prompt for the sub-agent to execute |
 | `subagent_type` | string | Yes | Sub-agent name to call (must be non-primary agent) |
-| `session_id` | string | No | Continue an existing sub-session |
+| `task_id` | string | No | Resume a previous task; pass its returned `task_id` to reuse the same subagent session |
 | `command` | string | No | Command that triggered this task (for debugging) |
 
 ### Execution Flow
@@ -418,20 +418,20 @@ Main Agent receives: Help me write API documentation
 4. Main Agent receives result → Continues conversation
 ```
 
-#### Continue Sub-session
+#### Resume a Task
 
-When a sub-agent needs to execute in steps, you can pass `session_id` to continue previous work:
+When a subagent needs to execute in steps, pass the `task_id` returned by the previous call to continue its work:
 
 ```
 TaskTool(
   description: "Complete documentation",
   prompt: "Check documentation completeness and fill in missing content",
   subagent_type: "docs-writer",
-  session_id: "abc123"  // Continue previous session
+  task_id: "abc123"  // Continue the previous task
 )
 ```
 
-> **Source**: `packages/opencode/src/tool/task.ts:23-193`
+> **Source**: `packages/opencode/src/tool/task.ts:43-172`
 
 ---
 

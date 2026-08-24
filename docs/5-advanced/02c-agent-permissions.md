@@ -334,11 +334,11 @@ task 权限控制 **Agent 可以调用哪些 subagent**。
 Task 工具的完整参数定义如下：
 
 | 参数 | 类型 | 必需 | 说明 |
-|------|------|------|
+|------|------|------|------|
 | `description` | string | 是 | 任务描述（3-5 个词），用作子会话标题 |
 | `prompt` | string | 是 | 子代理要执行的任务提示 |
 | `subagent_type` | string | 是 | 要调用的子代理名称（必须是非 primary agent） |
-| `session_id` | string | 否 | 继续已存在的子会话 |
+| `task_id` | string | 否 | 继续之前的任务；传入上次返回的 `task_id` 后，会复用同一个子代理会话 |
 | `command` | string | 否 | 触发此任务的命令（用于调试） |
 
 ### 执行流程
@@ -417,20 +417,20 @@ TaskTool 的工作流程如下：
 4. 主 Agent 接收结果 → 继续对话
 ```
 
-#### 继续子会话
+#### 继续任务
 
-当子代理需要分步执行时，可以传递 `session_id` 继续之前的工作：
+当子代理需要分步执行时，可以传递上次返回的 `task_id` 继续之前的工作：
 
 ```
 TaskTool(
   description: "完善文档",
   prompt: "检查文档完整性并补充缺失内容",
   subagent_type: "docs-writer",
-  session_id: "abc123"  // 继续之前的会话
+  task_id: "abc123"  // 继续之前的任务
 )
 ```
 
-> **来源**：`packages/opencode/src/tool/task.ts:23-193`
+> **来源**：`packages/opencode/src/tool/task.ts:43-172`
 
 ---
 
