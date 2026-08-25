@@ -7,10 +7,10 @@ lesson: "5.3a"
 duration: "20 minutes"
 practice: "25 minutes"
 level: "Advanced"
-description: "Learn Skill basics, encapsulate reusable domain knowledge, enable on-demand loading for Agents, and enhance AI capabilities."
+description: "Learn OpenCode Skill basics: package reusable expertise, write effective SKILL.md files, use progressive disclosure, and configure loading permissions."
 tags:
-  - Skill
-  - Progressive Disclosure
+  - "Skill"
+  - "Progressive Disclosure"
 prerequisite:
   - "5.2 Custom Agents"
 ---
@@ -104,7 +104,7 @@ Progressive disclosure lets Claude load only what's needed for the current task.
 ### Skill vs CLAUDE.md
 
 | Feature | CLAUDE.md | Skill |
-|---------|-----------|-------|
+| --- | --- | --- |
 | **Loading Timing** | Always loaded to context | Only loaded when task matches |
 | **Scope** | Current project | Reusable across projects |
 | **Content Type** | Pure Markdown | Markdown + code + resource files |
@@ -146,13 +146,40 @@ Progressive disclosure lets Claude load only what's needed for the current task.
 ### OpenCode Search Locations
 
 | Location | Scope | Description |
-|----------|-------|-------------|
+| --- | --- | --- |
 | `.opencode/skill/<name>/SKILL.md` | Current project | Project-specific skills |
 | `~/.config/opencode/skill/<name>/SKILL.md` | Global | Available for all projects |
 | `.claude/skills/<name>/SKILL.md` | Current project | Claude compatible format |
 | `~/.claude/skills/<name>/SKILL.md` | Global | Claude compatible format |
 
 > Project paths are traversed from current directory up to git root.
+
+### Project References Are Not a Skill's `references/`
+
+The `references/` directory inside a Skill is simply a conventional location for that Skill's own supporting material. The top-level `references` field in `opencode.json` is a separate feature: it registers local directories or Git repositories as project context.
+
+```jsonc
+{
+  "references": {
+    "backend": {
+      "path": "../backend",
+      "description": "Backend service source code"
+    },
+    "design-system": {
+      "repository": "https://github.com/example/design-system.git",
+      "branch": "main",
+      "description": "Components and design standards",
+      "hidden": true
+    }
+  }
+}
+```
+
+- Local entries use `path`; Git entries use `repository` and may specify `branch`.
+- When `description` is present, the reference is included in the system context; `hidden: true` only hides it from `@` autocomplete in the TUI.
+- Use the plural key `references`. The singular `reference` remains compatible in `v1.18.22` but is deprecated.
+
+See [`reference.ts:5-21`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/config/reference.ts#L5-L21) for the schema, [`system.ts:69-92`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L69-L92) for system-context injection, and [`autocomplete.tsx:423-439`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/component/prompt/autocomplete.tsx#L423-L439) for the TUI hiding logic.
 
 ::: info Custom Configuration Directory
 You can specify additional Skill search paths via the `OPENCODE_CONFIG_DIR` environment variable:
@@ -167,12 +194,7 @@ OpenCode will scan both:
 
 This is useful for team-shared Skills or using different Skill sets in different environments.
 
-Source evidence: `skill/skill.ts:82-85`
-```typescript
-const configDirs = process.env.OPENCODE_CONFIG_DIR
-  ? [process.env.OPENCODE_CONFIG_DIR, ...defaultConfigDirs]
-  : defaultConfigDirs
-```
+In `v1.18.22`, OpenCode retrieves every configuration directory from the configuration service, then scans each one for `{skill,skills}/**/SKILL.md` files. See [`skill/index.ts:205-208`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L205-L208).
 :::
 
 ### Nested Directory Support
@@ -187,12 +209,20 @@ OpenCode supports nested Skill directories:
             └── SKILL.md    # Skill name determined by frontmatter name field
 ```
 
-Source evidence: `skill/skill.ts:38`
+Source: [`skill/index.ts:21-25`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L21-L25)
 ```typescript
-const OPENCODE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
+const OPENCODE_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
 ```
 
 The `**` means matching subdirectories at any depth.
+
+### Built-in `customize-opencode` Skill
+
+`v1.18.22` registers `customize-opencode` by default for modifying OpenCode's own configuration, Agents, Skills, plugins, MCP servers, and permissions. It is registered before Skills found on disk, so a local Skill with the same name can override the built-in version. See [`skill/index.ts:27-35`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L27-L35) and [`skill/index.ts:276-284`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L276-L284).
+
+::: info Scout Is Historical, Not a Current Agent
+Scout was introduced briefly within this synchronization range but removed in `v1.16.0`. Do not continue to depend on Scout in Agent lists or workflows for `v1.18.22`; use the Agents and tools currently available when exploring a codebase.
+:::
 
 ---
 
@@ -204,13 +234,13 @@ The `**` means matching subdirectories at any depth.
 
 ```yaml
 ---
-name: sql-analysis
-description: Used for analyzing business data: revenue, ARR, customer segmentation, product usage, sales pipeline. Provides table structures, metric definitions, required filters, and query patterns.
+name: "sql-analysis"
+description: "Used for analyzing business data: revenue, ARR, customer segmentation, product usage, sales pipeline. Provides table structures, metric definitions, required filters, and query patterns."
 ---
 ```
 
 | Field | Required | Description |
-|-------|----------|-------------|
+| --- | --- | --- |
 | `name` | Yes | Skill identifier, used for invocation |
 | `description` | Yes | Trigger condition description (**most important!**) |
 | `license` | No | License information |
@@ -238,7 +268,7 @@ description is the **sole factor determining whether a Skill triggers**. Claude 
 
 **Poor Example**:
 ```yaml
-description: Help with documents
+description: "Help with documents"
 ```
 Problem: Too vague, AI can't determine when to trigger.
 
@@ -269,7 +299,7 @@ description: |
 
 ```markdown
 ---
-name: sql-analysis
+name: "sql-analysis"
 description: |
   Used for analyzing business data: revenue trends, ARR calculation, customer segmentation, product usage, sales pipeline.
   Provides: company table structures, metric definition formulas, standard filters, common query templates.
@@ -390,7 +420,7 @@ Configure in `opencode.json`:
 ```
 
 | Permission Value | Behavior |
-|-----------------|----------|
+| --- | --- |
 | `allow` | Skill loads immediately |
 | `deny` | Skill hidden from Agent, access denied |
 | `ask` | Prompt user confirmation before loading |
@@ -460,8 +490,8 @@ When disabled, `<available_skills>` section won't appear in that Agent's tool de
 
 ```markdown title=".opencode/skill/translate/SKILL.md"
 ---
-name: translate
-description: Professional translation, preserving format and terminology. Used for translating technical documentation, API docs, code comments.
+name: "translate"
+description: "Professional translation, preserving format and terminology. Used for translating technical documentation, API docs, code comments."
 ---
 
 # Translation Skill
@@ -488,8 +518,8 @@ For uncertain translations, annotate original in parentheses.
 
 ```markdown title=".opencode/skill/brand-guidelines/SKILL.md"
 ---
-name: brand-guidelines
-description: Apply company official brand colors and typography standards. Used for creating documents, presentations, interface designs requiring company visual style.
+name: "brand-guidelines"
+description: "Apply official company brand colors and typography standards when creating documents, presentations, or interface designs that require the company's visual style."
 ---
 
 # Brand Guidelines Skill
@@ -523,7 +553,7 @@ description: Apply company official brand colors and typography standards. Used 
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-------|-------|----------|
+| --- | --- | --- |
 | Skill won't load | SKILL.md case incorrect | Must be uppercase `SKILL.md` |
 | Skill not showing | Missing frontmatter fields | Must include `name` and `description` |
 | Task matches but doesn't trigger | description too vague | Add specific capabilities, scenarios, boundaries |
@@ -550,4 +580,4 @@ You learned:
 
 > Next lesson dives into advanced Skill usage: progressive disclosure three-layer structure, executable scripts, creation workflow, testing validation, and real-world examples.
 
-[Continue Learning: 5.3b Skill Advanced](./03b-skills-advanced)
+[Continue Learning: 5.3b Advanced Skills](/en/5-advanced/03b-skills-advanced)

@@ -36,6 +36,12 @@ prerequisite:
 
 SDK 客户端通过 `OpencodeClient` 类暴露以下模块：
 
+::: info 版本边界
+本章表格描述 V1 入口 `@opencode-ai/sdk`。`v1.18.22` 仍导出并保留 V1，同时通过 `@opencode-ai/sdk/v2` 扩展会话、问题、当前位置、事件流、历史分页、运行时操作和权限请求；V2 的平铺参数不能和本章 V1 的 `{ path, body }` 写法混用。
+:::
+
+> 来源：[`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20)、[`V1 OpencodeClient:1157-1197`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L1157-L1197)、[`V2 Session3:5426-5873`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5873)
+
 | 模块 | 描述 | 来源 |
 |------|------|------|
 | `global` | 全局事件订阅 | `sdk.gen.ts:233-243` |
@@ -93,7 +99,7 @@ SDK 客户端通过 `OpencodeClient` 类暴露以下模块：
 | `session.command({ path, body })` | 发送命令 | `{info: AssistantMessage, parts: Part[]}` |
 | `session.shell({ path, body })` | 运行 shell 命令 | `AssistantMessage` |
 | `session.revert({ path, body })` | 撤销到指定消息 | `Session` |
-| `session.unrevert({ path })` | 恢复已撤销的消息 | `Session` |
+| `session.unrevert({ path })` | 重做已撤销的消息与文件状态 | `Session` |
 
 ::: tip 权限响应
 Session 类**没有** `permission()` 方法。响应权限请求请使用 `OpencodeClient` 上的直接方法：
@@ -105,6 +111,25 @@ await client.postSessionIdPermissionsPermissionId({
 })
 ```
 :::
+
+### Undo / Revert / Redo
+
+V1 的 `session.revert()` 对应 undo/revert：它会把会话边界移到指定 `messageID`（可细化到 `partID`），收集边界之后的 patch，并默认恢复关联文件 snapshot。`session.unrevert()` 对应 redo/unrevert：恢复原 snapshot 后清除 revert 状态。两者都会拒绝运行中的 session。
+
+```typescript
+// Undo：回到指定消息，并默认回滚该边界之后的文件补丁
+await client.session.revert({
+  path: { id: sessionID },
+  body: { messageID: "msg-123" },
+})
+
+// Redo：恢复刚才撤销的消息与文件状态
+await client.session.unrevert({ path: { id: sessionID } })
+```
+
+配置 `snapshot: false` 只禁用文件 snapshot 的 undo/redo，不会删除消息边界的 revert 能力。
+
+> 来源：[`V1 sdk.gen.ts:678-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L678-L700)、[`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98)、[`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)
 
 ### 代码示例
 
@@ -515,20 +540,23 @@ await client.auth.set({
 
 | 方法 | 描述 | 返回类型 |
 |------|------|----------|
-| `provider.list()` | 列出所有提供商 | `Provider[]` |
-| `provider.auth()` | 获取提供商认证方法 | `ProviderAuthMethod[]` |
+| `provider.list()` | 列出所有提供商 | `{ all: Provider[], default: Record<string, string>, connected: string[] }` |
+| `provider.auth()` | 获取提供商认证方法 | `Record<string, ProviderAuthMethod[]>` |
 | `provider.oauth.authorize({ path, body })` | OAuth 授权 | - |
 | `provider.oauth.callback({ path, body })` | OAuth 回调 | - |
 
 ```typescript
 // 获取提供商列表
 const providers = await client.provider.list()
-for (const p of providers.data ?? []) {
+for (const p of providers.data?.all ?? []) {
   console.log(`${p.name} (${p.id}): ${Object.keys(p.models).length} 个模型`)
 }
 
 // 获取认证方法
 const authMethods = await client.provider.auth()
+for (const [providerID, methods] of Object.entries(authMethods.data ?? {})) {
+  console.log(providerID, methods)
+}
 ```
 
 ---
@@ -537,7 +565,7 @@ const authMethods = await client.provider.auth()
 
 | 方法 | 描述 | 返回类型 |
 |------|------|----------|
-| `mcp.status()` | 获取 MCP 服务器状态 | `McpStatus[]` |
+| `mcp.status()` | 获取 MCP 服务器状态 | `Record<string, McpStatus>` |
 | `mcp.add({ body })` | 动态添加 MCP 服务器 | - |
 | `mcp.connect({ path })` | 连接 MCP 服务器 | - |
 | `mcp.disconnect({ path })` | 断开 MCP 服务器 | - |
@@ -557,6 +585,9 @@ type McpStatus =
 ```typescript
 // 获取状态
 const status = await client.mcp.status()
+for (const [name, value] of Object.entries(status.data ?? {})) {
+  console.log(name, value.status)
+}
 
 // 动态添加 MCP 服务器
 await client.mcp.add({
@@ -1106,12 +1137,12 @@ type FileDiff = {
 
 ## 下一课预告
 
-> V1 讲完了，但 OpenCode 还有一个**实验性的下一代 API 入口** V2。下一课我们学习 **[5.10c SDK V2 下一代 API](./10c-sdk-v2)**。
+> V1 讲完了，但 OpenCode 还并存一个持续演进的 V2 入口。下一课我们学习 **[5.10c SDK V2 下一代 API](./10c-sdk-v2)**。
 >
 > 你会学到：
-> - V2 的 27 个模块和三层路由架构
+> - 顶层兼容模块与 `client.v2.*` 命名空间
 > - 独立的 Permission/Question 模块（跨 session 管理权限和提问）
-> - Session2 增强方法（interrupt/wait/compact/切换模型/切换 agent）
+> - Session3 增强方法（interrupt/wait/compact/切换模型/切换 agent）
 > - Sync、Worktree、Workspace 等 V2 新概念
 > - 从 V1 迁移到 V2 的完整指南
 
@@ -1121,4 +1152,4 @@ type FileDiff = {
 
 - [5.10a SDK 基础](./10a-sdk-basics) - 入门教程
 - [5.9 远程开发](./09a-remote-basics) - HTTP Server 详解
-- [SDK 类型定义源码](https://github.com/opencode-ai/opencode/blob/dev/packages/sdk/js/src/gen/types.gen.ts)
+- [SDK 类型定义源码（v1.18.22）](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/types.gen.ts)

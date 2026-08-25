@@ -7,18 +7,18 @@ lesson: "5.10b"
 duration: "30 minutes"
 practice: "40 minutes"
 level: "Advanced"
-description: "OpenCode SDK provides 21 API modules and 35+ event types, covering all features including sessions, files, configuration, MCP, LSP, and more."
+description: "OpenCode SDK provides 20 API modules, one permission-response method, and 32 event types covering sessions, files, configuration, MCP, LSP, and more."
 tags:
-  - SDK
-  - API
-  - Reference
+  - "SDK"
+  - "API"
+  - "Reference"
 prerequisite:
   - "5.10a SDK Basics"
 ---
 
 # 5.10b API Reference
 
-> **One-line summary**: OpenCode SDK provides 21 API modules and 35+ event types, covering all features including sessions, files, configuration, MCP, LSP, and more.
+> **One-line summary**: OpenCode SDK provides 20 API modules, one permission-response method, and 32 event types covering sessions, files, configuration, MCP, LSP, and more.
 
 ---
 
@@ -35,6 +35,12 @@ Key takeaways from this lesson:
 ## API Module Overview
 
 The SDK client exposes the following modules through the `OpencodeClient` class:
+
+::: info Version boundary
+The tables in this chapter describe the V1 entry point, `@opencode-ai/sdk`. `v1.18.22` continues to export and retain V1 while extending sessions, questions, the current location, event streams, paginated history, runtime operations, and permission requests through `@opencode-ai/sdk/v2`. Do not mix V2's flat parameters with the V1 `{ path, body }` syntax used in this chapter.
+:::
+
+> Source: [`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20), [`V1 OpencodeClient:1157-1197`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L1157-L1197), [`V2 Session3:5426-5873`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5873)
 
 | Module | Description | Source |
 |--------|-------------|--------|
@@ -88,13 +94,42 @@ Sessions are the core module of the SDK, providing message sending, history mana
 | `session.summarize({ path, body })` | Summarize session content | `boolean` |
 | `session.messages({ path })` | Get session message list | `{info: Message, parts: Part[]}[]` |
 | `session.message({ path })` | Get single message details | `{info: Message, parts: Part[]}` |
-| `session.prompt({ path, body })` | Send message and wait for response | `AssistantMessage` |
+| `session.prompt({ path, body })` | Send message and wait for response | `{info: AssistantMessage, parts: Part[]}` |
 | `session.promptAsync({ path, body })` | Send message asynchronously (no wait) | `204 No Content` |
 | `session.command({ path, body })` | Send command | `{info: AssistantMessage, parts: Part[]}` |
 | `session.shell({ path, body })` | Run shell command | `AssistantMessage` |
 | `session.revert({ path, body })` | Revert to specified message | `Session` |
-| `session.unrevert({ path })` | Restore reverted message | `Session` |
-| `session.permission({ path, body })` | Respond to permission request | `boolean` |
+| `session.unrevert({ path })` | Redo the reverted message and file state | `Session` |
+
+::: tip Responding to permission requests
+The Session class does **not** have a `permission()` method. Respond to permission requests with this direct method on `OpencodeClient`:
+
+```typescript
+await client.postSessionIdPermissionsPermissionId({
+  path: { id: "session-id", permissionID: "perm-id" },
+  body: { response: "always" },  // "once" | "always" | "reject"
+})
+```
+:::
+
+### Undo / Revert / Redo
+
+V1's `session.revert()` performs undo/revert: it moves the session boundary to the specified `messageID` (optionally narrowed to a `partID`), collects patches after that boundary, and restores the related file snapshot by default. `session.unrevert()` performs redo/unrevert: it restores the original snapshot and then clears the revert state. Both reject requests while the session is running.
+
+```typescript
+// Undo: return to a specific message and roll back later file patches by default
+await client.session.revert({
+  path: { id: sessionID },
+  body: { messageID: "msg-123" },
+})
+
+// Redo: restore the messages and file state that were just undone
+await client.session.unrevert({ path: { id: sessionID } })
+```
+
+Setting `snapshot: false` disables only file-snapshot undo/redo; it does not remove message-boundary revert support.
+
+> Source: [`V1 sdk.gen.ts:678-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L678-L700), [`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98), [`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)
 
 ### Code Example
 
@@ -138,16 +173,135 @@ const diff = await client.session.diff({
 await client.session.abort({
   path: { id: session.data!.id },
 })
+
+// Share the session (generates an accessible URL)
+const shared = await client.session.share({ path: { id: session.data!.id } })
+console.log(`Share URL: ${shared.data?.share?.url}`)
+
+// Stop sharing
+await client.session.unshare({ path: { id: session.data!.id } })
 ```
 
 ### prompt body Parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `parts` | `Part[]` | Message content parts |
+| `parts` | `Array<TextPartInput \| FilePartInput \| AgentPartInput \| SubtaskPartInput>` | Message content parts |
 | `model` | `{providerID, modelID}` | Specify model |
 | `noReply` | `boolean` | Set to `true` to not trigger AI response (inject context) |
 | `agent` | `string` | Use specified Agent |
+
+### Token Usage and Cost
+
+Every AI response includes token usage and cost, with no extra request required. The `info` field returned by `session.prompt()` (an `AssistantMessage`) contains `cost` and `tokens`:
+
+```typescript
+const result = await client.session.prompt({
+  path: { id: sessionID },
+  body: {
+    parts: [{ type: "text", text: "Analyze this code" }],
+  },
+})
+
+const info = result.data?.info  // AssistantMessage
+if (info) {
+  console.log(`Cost: $${info.cost}`)
+  console.log(`Input tokens: ${info.tokens.input}`)
+  console.log(`Output tokens: ${info.tokens.output}`)
+  console.log(`Reasoning tokens: ${info.tokens.reasoning}`)
+  console.log(`Cache reads: ${info.tokens.cache.read}`)
+  console.log(`Cache writes: ${info.tokens.cache.write}`)
+}
+```
+
+> Source: `types.gen.ts:112-141` (`AssistantMessage` type)
+
+**Per-step usage**: If a model runs multiple steps, such as tool calls, each completed step produces a `StepFinishPart` with its own `cost` and `tokens`, allowing you to measure usage for **each step**:
+
+```typescript
+// Iterate over every Part in a message and report per-step usage
+const msg = await client.session.message({
+  path: { id: sessionID, messageID: "msg-1" },
+})
+
+for (const part of msg.data?.parts ?? []) {
+  if (part.type === "step-finish") {
+    console.log(`Step cost: $${part.cost}, output: ${part.tokens.output} tokens`)
+  }
+}
+```
+
+> Source: `types.gen.ts:315-332` (`StepFinishPart` type)
+
+::: tip Calculate total usage for an entire session
+Iterate over all messages returned by `session.messages()` and sum the `cost` and `tokens` values from each `AssistantMessage`.
+:::
+
+### Monitoring Tool Calls
+
+Each `ToolPart` in an AI response records the complete lifecycle of a tool call. Inspect `part.state` to identify its current phase and obtain the input, output, and duration:
+
+```typescript
+const msg = await client.session.message({
+  path: { id: sessionID, messageID: "msg-1" },
+})
+
+for (const part of msg.data?.parts ?? []) {
+  if (part.type !== "tool") continue
+  console.log(`Tool: ${part.tool}`)
+  const state = part.state
+  switch (state.status) {
+    case "completed":
+      console.log(`  Result: ${state.output}`)
+      console.log(`  Duration: ${state.time.end - state.time.start}ms`)
+      break
+    case "error":
+      console.log(`  Error: ${state.error}`)
+      break
+    case "running":
+      console.log(`  Running...`)
+      break
+    case "pending":
+      console.log(`  Pending`)
+      break
+  }
+}
+```
+
+The four tool-call states are:
+
+| State | Description | Available Fields |
+| --- | --- | --- |
+| `pending` | Waiting to run | `input` (arguments), `raw` (raw input) |
+| `running` | Running | `input`, `title`, `time.start` |
+| `completed` | Completed | `input`, `output` (result), `title`, `time.{start,end}`, `attachments` |
+| `error` | Failed | `input`, `error` (error message), `time.{start,end}` |
+
+> Source: `types.gen.ts:237-305` (the four `ToolState` subtypes and `ToolPart`)
+
+### Session Code-Change Statistics
+
+The `Session` type includes a `summary` field that records how much code the session changed, so you do not need to calculate a diff manually:
+
+```typescript
+const session = await client.session.get({ path: { id: sessionID } })
+const summary = session.data?.summary
+if (summary) {
+  console.log(`Files changed: ${summary.files}`)
+  console.log(`Lines added: ${summary.additions}`)
+  console.log(`Lines deleted: ${summary.deletions}`)
+  // summary.diffs contains the diff for each file
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `summary.files` | `number` | Number of files changed |
+| `summary.additions` | `number` | Number of lines added |
+| `summary.deletions` | `number` | Number of lines deleted |
+| `summary.diffs` | `FileDiff[]?` | Per-file diff details |
+
+> Source: `types.gen.ts:533-560` (`Session.summary` field)
 
 ---
 
@@ -225,10 +379,9 @@ for (const file of status.data ?? []) {
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `query` | `string` | Search pattern (supports glob) |
-| `type` | `"file" \| "directory"` | Search type |
-| `directory` | `string` | Override search root directory |
-| `limit` | `number` | Maximum results (1-200) |
+| `query` | `string` | Search pattern (supports glob; required) |
+| `dirs` | `"true" \| "false"` | Whether to return directories only (string; optional) |
+| `directory` | `string` | Override search root directory (optional) |
 
 ```typescript
 // Search text
@@ -238,7 +391,12 @@ const matches = await client.find.text({
 
 // Find files
 const tsFiles = await client.find.files({
-  query: { query: "*.ts", type: "file", limit: 50 },
+  query: { query: "*.ts" },
+})
+
+// Find directories only
+const dirs = await client.find.files({
+  query: { query: "src", dirs: "true" },
 })
 
 // Find symbols
@@ -382,20 +540,23 @@ await client.auth.set({
 
 | Method | Description | Return Type |
 |--------|-------------|-------------|
-| `provider.list()` | List all providers | `Provider[]` |
-| `provider.auth()` | Get provider authentication methods | `ProviderAuthMethod[]` |
+| `provider.list()` | List all providers | `{ all: Provider[], default: Record<string, string>, connected: string[] }` |
+| `provider.auth()` | Get provider authentication methods | `Record<string, ProviderAuthMethod[]>` |
 | `provider.oauth.authorize({ path, body })` | OAuth authorize | - |
 | `provider.oauth.callback({ path, body })` | OAuth callback | - |
 
 ```typescript
 // Get provider list
 const providers = await client.provider.list()
-for (const p of providers.data ?? []) {
+for (const p of providers.data?.all ?? []) {
   console.log(`${p.name} (${p.id}): ${Object.keys(p.models).length} models`)
 }
 
 // Get authentication methods
 const authMethods = await client.provider.auth()
+for (const [providerID, methods] of Object.entries(authMethods.data ?? {})) {
+  console.log(providerID, methods)
+}
 ```
 
 ---
@@ -404,7 +565,7 @@ const authMethods = await client.provider.auth()
 
 | Method | Description | Return Type |
 |--------|-------------|-------------|
-| `mcp.status()` | Get MCP server status | `McpStatus[]` |
+| `mcp.status()` | Get MCP server status | `Record<string, McpStatus>` |
 | `mcp.add({ body })` | Dynamically add MCP server | - |
 | `mcp.connect({ path })` | Connect MCP server | - |
 | `mcp.disconnect({ path })` | Disconnect MCP server | - |
@@ -424,13 +585,18 @@ type McpStatus =
 ```typescript
 // Get status
 const status = await client.mcp.status()
+for (const [name, value] of Object.entries(status.data ?? {})) {
+  console.log(name, value.status)
+}
 
 // Dynamically add MCP server
 await client.mcp.add({
   body: {
     name: "my-mcp",
-    type: "local",
-    command: ["node", "mcp-server.js"],
+    config: {
+      type: "local",
+      command: ["node", "mcp-server.js"],
+    },
   },
 })
 
@@ -572,7 +738,7 @@ for (const cmd of commands.data ?? []) {
 
 ## Complete Event Types List
 
-The SDK supports 35+ real-time events, subscribable via `client.event.subscribe()`.
+The SDK supports 32 real-time events, subscribable via `client.event.subscribe()`.
 
 ### Server Events
 
@@ -699,7 +865,7 @@ for await (const event of events.stream) {
           id: event.properties.sessionID,
           permissionID: event.properties.id,
         },
-        body: { allow: true },
+        body: { response: "always" },  // "once" allows once | "always" always allows | "reject" rejects
       })
       break
       
@@ -862,6 +1028,35 @@ type ApiError = {
 }
 ```
 
+`AssistantMessage.error` can be one of five types:
+
+| Error Type | Meaning | Common Cause |
+| --- | --- | --- |
+| `ProviderAuthError` | Authentication failed | API key is invalid or expired |
+| `MessageOutputLengthError` | Output too long | The model's maximum output-token limit was exceeded |
+| `MessageAbortedError` | Interrupted | The user called `session.abort()` or the request timed out |
+| `ApiError` | API returned an error | Rate limiting (429), server errors (500), and similar failures; inspect `data.statusCode` and `data.isRetryable` |
+| `UnknownError` | Unknown error | Other unclassified errors |
+
+```typescript
+const result = await client.session.prompt({ path: { id: sessionID }, body: { ... } })
+const error = result.data?.info.error
+if (error) {
+  switch (error.name) {
+    case "APIError":
+      if (error.data.isRetryable) console.log("Retryable; try again later")
+      else console.log(`API error ${error.data.statusCode}: ${error.data.message}`)
+      break
+    case "ProviderAuthError":
+      console.log("API key problem; check the authentication configuration")
+      break
+    // ...
+  }
+}
+```
+
+> Source: `types.gen.ts:70-110` (the five `MessageError` subtypes)
+
 ### Other Types
 
 ```typescript
@@ -933,15 +1128,29 @@ type FileDiff = {
 
 You learned:
 
-1. **21 API modules** complete method list
-2. **35+ event types** and their properties
+1. **The complete method list for 20 API modules plus one permission-response method**
+
+2. **32 event types** and their properties
 3. **Core type definitions**: Session, Message, Part, Todo, Agent, etc.
 4. **Experimental APIs**: Tool management, PTY terminal
 
 ---
 
+## Next Lesson Preview
+
+> We have finished V1, but OpenCode also ships an evolving V2 entry point alongside it. In the next lesson, we cover **[5.10c SDK V2: Next-Generation API](/en/5-advanced/10c-sdk-v2)**.
+>
+> You'll learn:
+> - Top-level compatibility modules and the `client.v2.*` namespace
+> - Standalone Permission and Question modules for managing permissions and questions across sessions
+> - Enhanced Session3 methods: interrupt, wait, compact, switching models, and switching agents
+> - New V2 concepts including Sync, Worktree, and Workspace
+> - A complete guide to migrating from V1 to V2
+
+---
+
 ## Related Resources
 
-- [5.10a SDK Basics](./10a-sdk-basics) - Getting started tutorial
-- [5.9 Remote Development](./09a-remote-basics) - HTTP Server details
-- [SDK Type Definitions Source](https://github.com/opencode-ai/opencode/blob/dev/packages/sdk/js/src/gen/types.gen.ts)
+- [5.10a SDK Basics](/en/5-advanced/10a-sdk-basics) - Getting started tutorial
+- [5.9 Remote Development](/en/5-advanced/09a-remote-basics) - HTTP Server details
+- [SDK Type Definitions Source (v1.18.22)](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/types.gen.ts)

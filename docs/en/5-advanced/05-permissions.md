@@ -1,12 +1,12 @@
 ---
 title: "5.5 Permission Control"
 subtitle: "Security Policy Configuration"
-course: "OpenCode Chinese Practical Course"
+course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.5"
 duration: "15 minutes"
 level: "Advanced"
-description: "Configure permission policies to control what AI can and cannot do, ensuring safe operations. Including external directory access control."
+description: "Learn OpenCode permission control: configure allow, ask, and deny rules, secure Bash and file access, manage Agents, and allow external directories safely."
 tags:
   - "Permissions"
   - "Security"
@@ -57,10 +57,30 @@ Key knowledge points from this lesson:
 ## Permission Modes
 
 | Mode | Description |
-|-----|------|
+| --- | --- |
 | `allow` | Allow execution without asking |
 | `ask` | Ask user for confirmation each time |
 | `deny` | Deny execution |
+
+---
+
+## Boundaries of Automatic Approval Mode
+
+Both the standard TUI and non-interactive `run` command publicly expose `--auto`:
+
+```bash
+# Standard TUI
+opencode --auto
+
+# Non-interactive task
+opencode run --auto "Run the tests and fix any failures"
+```
+
+It automatically approves only permission requests that would otherwise enter the `ask` flow. It **does not override explicit `deny` rules**. For example, after configuring `"rm *": "deny"`, matching deletion commands are still rejected even when you use `--auto`.
+
+The target version also accepts the hidden `--yolo` flag as a compatibility alias and maps it to the same automatic-approval behavior as `--auto`. New commands and scripts should use the public `--auto` flag. This switch applies to the standard TUI and `opencode run`; the `opencode --mini` entry point does not forward it.
+
+> **Source (v1.18.22)**: [`tui.ts:108-121`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L108-L121), [`tui.ts:287-295`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L287-L295), and [`run.ts:242-274`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L242-L274)
 
 ---
 
@@ -133,9 +153,9 @@ A common pattern is to put wildcard `"*"` rules first, followed by more specific
 These permissions can use object syntax to configure different pattern rules:
 
 | Permission | Description | Match Content |
-|------|------|---------|
+| --- | --- | --- |
 | `read` | Read files | File path |
-| `edit` | File modification permission (covers edit, write, patch, multiedit) | File path |
+| `edit` | File modification permission (covers edit, write, and patch) | File path |
 | `glob` | File wildcard search | glob pattern |
 | `grep` | Content search | regex pattern |
 | `list` | List directory files | Directory path |
@@ -145,22 +165,20 @@ These permissions can use object syntax to configure different pattern rules:
 | `lsp` | Run LSP query | Supports fine-grained matching |
 | `external_directory` | Access paths outside project | Directory path |
 
-> 📝 Note: `edit` permission covers four tool operations: write (create new files), edit (modify files), patch (patch files), multiedit (batch edit).
+> 📝 Note: The target version has no `multiedit` tool. File creation, editing, and patch operations are all controlled by the `edit` permission.
 
 ### Permissions Supporting Only Simple Syntax
 
 These permissions can only be set to `allow`/`ask`/`deny`, object syntax not supported:
 
 | Permission | Description |
-|------|------|
-| `todoread` | Read todo list |
+| --- | --- |
 | `todowrite` | Update todo list |
 | `webfetch` | Fetch URL content (passes URL at runtime for always approval) |
 | `websearch` | Web search (passes query at runtime for always approval) |
-| `codesearch` | Code search (passes query at runtime for always approval) |
 | `doom_loop` | Triggered when same tool call repeats 3 times |
 
-> ⚠️ Note: `plan_enter` and `plan_exit` are only used as default permission configuration for built-in Agents, configuring them in opencode.json has no effect. The `question` field can be configured by users but generally doesn't need modification.
+> ⚠️ Note: The target version has no `plan_enter` tool implementation, so configuring a permission key with that name does not create a callable action. The experimental `plan_exit` tool does exist; when exposed, it is evaluated through the normal permission rules, and user rules can override its built-in default.
 
 > **Source**: `opencode/packages/opencode/src/config/config.ts:621-652`
 
@@ -177,8 +195,8 @@ These permissions can only be set to `allow`/`ask`/`deny`, object syntax not sup
   "permission": {
     "read": {
       "*": "allow",
-      "*.env": "deny",
-      "*.env.*": "deny",
+      "*.env": "ask",
+      "*.env.*": "ask",
       "*.env.example": "allow"  // Example files allowed
     }
   }
@@ -194,23 +212,23 @@ These permissions can only be set to `allow`/`ask`/`deny`, object syntax not sup
 OpenCode has four main built-in Agents, each with different default permissions:
 
 | Tool/Permission | build | plan | general | explore |
-|----------|-------|------|---------|---------|
+| --- | --- | --- | --- | --- |
 | File read | ✅ | ✅ | ✅ | ✅ |
-| File edit | ✅ | ❌ (only `.opencode/plans/*.md` allowed) | ✅ | ❌ |
+| File edit | ✅ | ❌ (only project-level or global plan files are allowed) | ✅ | ❌ |
 | Shell commands | ✅ | ✅ | ✅ | ✅ |
 | Web search/fetch | ✅ | ✅ | ✅ | ✅ |
 | Code search | ✅ | ✅ | ✅ | ✅ |
 | TODO management | ✅ | ✅ | ❌ | ❌ |
-| Question tool | ✅ | ✅ | ✅ | ❌ |
-| Plan enter/exit | ✅ | ✅ | ❌ | ❌ |
-| External directory access | ⚠️ (default ask) | ⚠️ (ask, only .opencode/plans/* allowed) | ⚠️ (default ask) | ⚠️ (ask, only GLOB allowed) |
+| Question tool | ✅ | ✅ | ❌ | ❌ |
+| `plan_exit` | ❌ | ✅ | ❌ | ❌ |
+| External directory access | ⚠️ (default ask) | ⚠️ (default ask; also allows the global plans directory) | ⚠️ (default ask) | ⚠️ (default ask; inherits the common allowlist) |
 
 ::: details 📝 Note: External Directory Permission Details
-All Agents default to requiring user confirmation (ask) when accessing external directories, but some Agents have exceptions:
+All Agents require user confirmation (`ask`) by default when accessing external directories and inherit the common allowlist for temporary truncation directories, temporary directories, Skill directories, and Reference directories. Some Agents also have exceptions:
 - **build**: Default ask
-- **plan**: Default ask, but allows access to `.opencode/plans/*` directory
+- **plan**: Default ask, but also allows `plans/*` under the global data directory. Project-level `.opencode/plans/*.md` is covered by the `edit` allowlist, not an external-directory exception
 - **general**: Default ask
-- **explore**: Default ask, but allows GLOB path access
+- **explore**: Default ask and inherits the common allowlist for truncated output, temporary, Skill, and Reference directories
 :::
 
 ::: details 📝 Note: Detailed Agent Descriptions
@@ -222,17 +240,17 @@ All Agents default to requiring user confirmation (ask) when accessing external 
 
 ### Plan Agent
 - **Mode**: `primary`
-- **Permissions**: edit defaults to deny, only allows editing `.opencode/plans/*.md` plan files
+- **Permissions**: `edit` defaults to deny and allows only project-level or global plan files
 - **Purpose**: Read-only planning, doesn't modify code, ensures focused thinking during analysis phase
 
 ### General Agent
 - **Mode**: `subagent`
-- **Permissions**: TODO tools denied (todoread/todowrite: deny)
+- **Permissions**: `todowrite` and `question` are denied by default
 - **Purpose**: General research, multi-step tasks
 
 ### Explore Agent
 - **Mode**: `subagent`
-- **Permissions**: All tools denied by default (`"*": "deny"`), only allows grep/glob/list/bash/read/webfetch/websearch/codesearch
+- **Permissions**: All tools denied by default (`"*": "deny"`), then only exploration-oriented reading, searching, and shell capabilities are allowed
 - **Purpose**: Quick code exploration
 
 :::
@@ -250,7 +268,7 @@ When AI attempts to access files **outside the project working directory**, the 
 The following tools trigger this permission when accessing paths outside the project:
 
 | Tool | Trigger Condition |
-|------|---------|
+| --- | --- |
 | `read` | Reading files outside project |
 | `edit` | Editing files outside project |
 | `write` | Writing files outside project |
@@ -275,7 +293,7 @@ If the relative path starts with `..`, the file is outside the project directory
 ```jsonc
 {
   "permission": {
-    "external_directory": "ask"  // Default: ask for confirmation each time for non-GLOB paths
+    "external_directory": "ask"  // Default: ask for confirmation for external paths outside the allowlist
   }
 }
 ```
@@ -318,7 +336,7 @@ This is one of the most common configurations, especially suitable for:
 ### Configuration Methods Summary
 
 | Method | Configuration Location | Example |
-|------|---------|------|
+| --- | --- | --- |
 | Global config | `~/.config/opencode/opencode.json` | `"external_directory": "allow"` |
 | Project config | `project_root/opencode.json` | `"external_directory": "allow"` |
 | Environment variable | `OPENCODE_PERMISSION` | `export OPENCODE_PERMISSION='{"external_directory": "allow"}'` |
@@ -354,7 +372,7 @@ OpenCode parses Bash commands into **readable command prefixes** before matching
 ### Parsing Examples
 
 | Input Command | Parsed Match Pattern |
-|---------|----------------|
+| --- | --- |
 | `git checkout main` | `git checkout` |
 | `npm install` | `npm install` |
 | `npm run dev` | `npm run dev` |
@@ -364,7 +382,7 @@ OpenCode parses Bash commands into **readable command prefixes** before matching
 ### Common Command Arity
 
 | Command Prefix | Arity | Description |
-|---------|-------|------|
+| --- | --- | --- |
 | `git` | 2 | Matches `git <subcommand>` |
 | `npm` | 2 | Matches `npm <subcommand>` |
 | `npm run` | 3 | Matches `npm run <script>` |
@@ -398,7 +416,7 @@ OpenCode parses Bash commands into **readable command prefixes** before matching
 When OpenCode prompts for approval, it provides three options:
 
 | Option | Behavior |
-|------|------|
+| --- | --- |
 | `once` | Approve only this request |
 | `always` | Approve future requests matching the **suggested pattern** (current session) |
 | `reject` | Reject the request |
@@ -449,12 +467,12 @@ Configure permissions in Markdown agents:
 
 ```markdown
 ---
-description: Read-only code review
-mode: subagent
+description: "Read-only code review"
+mode: "subagent"
 permission:
-  edit: deny
-  bash: ask
-  webfetch: deny
+  edit: "deny"
+  bash: "ask"
+  webfetch: "deny"
 ---
 
 Only analyze code and suggest changes, don't execute any modifications.
@@ -593,7 +611,7 @@ Configure relaxed permissions in project `.opencode/opencode.json`:
 ## Common Pitfalls
 
 | Symptom | Cause | Solution |
-|-----|-----|-----|
+| --- | --- | --- |
 | Permission config not working | Used `permissions` (plural) | Use `permission` (singular) |
 | Command unexpectedly blocked | Rule order issue | **Last matched rule wins**, put `*` first |
 | Cannot read .env | Denied by default | Explicitly add allow rule |
@@ -612,8 +630,8 @@ You learned:
 1. Three permission modes (allow/ask/deny)
 2. Using `permission` configuration (singular)
 3. Distinguishing permissions supporting object syntax vs simple syntax
-4. **Complete list of permission fields** (read, edit, glob, grep, list, bash, task, skill, lsp, external_directory, todowrite, todoread, webfetch, websearch, codesearch, doom_loop, question)
-   - Note: `write`, `patch`, `multiedit` tools use `edit` permission
+4. **Common permission fields** (read, edit, glob, grep, list, bash, task, skill, lsp, external_directory, todowrite, webfetch, websearch, doom_loop, question)
+   - Note: `write` and `patch` operations use the `edit` permission
 5. **Permission matrix for four built-in Agents** (build/plan/general/explore)
 6. Bash command Arity parsing mechanism
 7. `always` pattern matching behavior

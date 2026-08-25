@@ -1,5 +1,5 @@
 ---
-title: "B3 Documentation & Git"
+title: "B3 Documentation and Git Workflows | OpenCode Tutorial"
 subtitle: "Auto-generate README, commit, PR"
 course: "OpenCode Practical Course"
 stage: "Stage 4"
@@ -7,12 +7,12 @@ lesson: "B3"
 duration: "15 min"
 practice: "20 min"
 level: "Advanced"
-description: "Use AI to auto-generate README documentation, Git commit messages, and Pull Request descriptions to improve collaboration efficiency."
+description: "Learn OpenCode documentation and Git workflows by generating project READMEs, Conventional Commit messages, PR descriptions, and complete JSDoc comments."
 tags:
-  - Documentation
-  - Git
-  - README
-  - commit
+  - "Documentation"
+  - "Git"
+  - "README"
+  - "commit"
 prerequisite:
   - "B1 Developer Daily"
 ---
@@ -69,7 +69,7 @@ Key takeaways from this lesson:
 ### Documentation Automation Scenarios
 
 | Doc Type | When to Generate | AI Assistance |
-|---------|---------|-----------|
+| --- | --- | --- |
 | README | Project start / major updates | Analyze project structure |
 | API Docs | After interface development | Extract from code |
 | Commit Message | Each commit | Analyze changes |
@@ -169,7 +169,15 @@ If you're not satisfied with AI's changes:
 /undo
 ```
 
-**You should see**: The most recent conversation changes are reverted, and related file changes are rolled back (requires Git repo). For more details see https://opencode.ai/docs/tui#undo or [Appendix/Commands Reference](../appendix/commands).
+**You should see**: The session returns to the previous user message, and file patches associated with everything after it are rolled back as well (file restoration requires a Git repository). For more details, see https://opencode.ai/docs/tui#undo or [Appendix/Command Reference](/en/appendix/commands).
+
+To restore the conversation and files you just undid:
+
+```
+/redo
+```
+
+> `"snapshot": false` disables only file restoration; it does not disable conversation undo/redo. Source references: [`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98) and [`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55).
 
 
 ### Step 5: Add Code Comments
@@ -276,7 +284,7 @@ Format: `<type>(<scope>): <description>`
 ### 📝 PR Description Generation
 > Expected outcome: Generate clear PR descriptions to help reviewers understand changes
 
-```
+````
 ## Role
 You are a technical writing expert who excels at writing clear technical docs.
 
@@ -322,7 +330,7 @@ Closes #【Issue number】
 - ✅ If UI changes, remind to attach screenshots
 - ❌ Don't miss related Issues
 - ❌ Don't make changes section too vague
-```
+````
 
 
 ---
@@ -341,10 +349,10 @@ Closes #【Issue number】
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-----|-----|-----|
+| --- | --- | --- |
 | README inaccurate | AI analysis incomplete | Use @explore first to let AI understand the project |
 | Wrong commit format | No standard specified | Explicitly require Conventional Commits |
-| /undo doesn't work | Not a Git repo | Run `git init` first |
+| /undo changed the messages but did not restore the files | The project is not a Git repository, or `snapshot: false` is set | Use a Git repository and enable snapshots |
 
 ---
 

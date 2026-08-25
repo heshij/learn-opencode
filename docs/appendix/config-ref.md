@@ -1,11 +1,11 @@
 ---
-title: opencode.json 配置详解
-description: opencode.json 配置文件的详细参考手册，涵盖所有可用字段
+title: OpenCode 配置详解
+description: opencode.json 主配置与 tui.json 界面配置的详细参考手册
 ---
 
-# opencode.json 配置详解
+# OpenCode 配置详解
 
-> 本文档是 OpenCode 配置文件的完整参考手册，详细解释 `opencode.json` 中可用的每一个字段。
+> 本文档介绍 `opencode.json` 主配置和独立的 `tui.json` 界面配置。两者都支持 `.jsonc` 后缀。
 
 ## 📝 课程笔记
 
@@ -50,7 +50,6 @@ OpenCode 按以下顺序加载配置（优先级从低到高，后者覆盖前�
 | 字段 | 类型 | 说明 | 默认值 |
 |------|------|------|--------|
 | `username` | string | 在对话中显示的用户名。如果不设置，使用系统用户名。 | 系统用户 |
-| `theme` | string | 界面主题名称。详见 [主题列表](../5-advanced/06a-themes)。 | - |
 | `autoupdate` | boolean \| "notify" | 自动更新行为。`true`=自动更新，`false`=禁用，`"notify"`=仅通知。 | - |
 | `logLevel` | enum | 日志级别。可选值：`"DEBUG"`, `"INFO"`, `"WARN"`, `"ERROR"`。 | - |
 | `snapshot` | boolean | 是否启用 Git 快照备份机制。设为 `false` 禁用。 | 未设置时启用 |
@@ -73,14 +72,23 @@ OpenCode 按以下顺序加载配置（优先级从低到高，后者覆盖前�
 
 ---
 
-## 界面配置 (tui)
+## TUI 界面配置 (tui.json)
 
-控制终端界面 (TUI) 的显示行为。
+终端界面配置使用独立的 `tui.json` 或 `tui.jsonc`。`theme`、`keybinds` 和其他界面字段都直接位于根对象，不能写在主 `opencode.json`，也不需要再套一层 `tui`。
 
-```json
-"tui": {
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "tokyonight",
+  "keybinds": {
+    "session_new": "<leader>n"
+  },
   "scroll_speed": 3,
-  "diff_style": "auto"
+  "diff_style": "auto",
+  "cursor": {
+    "style": "block",
+    "blinking": true
+  }
 }
 ```
 
@@ -90,6 +98,33 @@ OpenCode 按以下顺序加载配置（优先级从低到高，后者覆盖前�
 | `scroll_acceleration` | object | 滚动加速配置。 | - |
 | `scroll_acceleration.enabled` | boolean | 是否启用 macOS 风格的惯性滚动加速。 | `false` |
 | `diff_style` | enum | 差异对比显示样式。`"auto"`(自适应), `"stacked"`(始终单列)。 | `"auto"` |
+| `theme` | string | 界面主题名称。详见 [主题列表](../5-advanced/06a-themes)。 | - |
+| `keybinds` | object | 快捷键覆盖映射，会与内置默认值合并。 | `{}` |
+| `cursor.style` | enum | `"block"`、`"underline"`、`"line"` 或 `"default"`。 | 配置了 `cursor` 时为 `"block"` |
+| `cursor.blinking` | boolean | 光标是否闪烁；style 为 `default` 时无效。 | 配置了 `cursor` 时为 `true` |
+
+### TUI 配置加载优先级
+
+优先级从低到高：
+
+1. 全局 `~/.config/opencode/tui.json`、`tui.jsonc`
+2. `OPENCODE_TUI_CONFIG` 指定的文件
+3. 从当前打开目录向文件系统根逐层发现，再按根侧到当前目录应用的 `tui.json`、`tui.jsonc`，越靠近当前目录优先级越高
+4. 逐层 `.opencode/tui.json`、`tui.jsonc`
+5. `OPENCODE_CONFIG_DIR` 中的同名文件
+
+同一配置目录同时存在时先加载 `.json`，再加载 `.jsonc`。各层配置深度合并，项目配置可以覆盖 `OPENCODE_TUI_CONFIG` 中的值。普通项目文件按根侧到当前目录应用，越近当前目录越优先；多个 `.opencode` 目录则按当前侧到根侧合并，冲突时更靠根侧者后加载并取胜。`OPENCODE_CONFIG_DIR` 最后加载。
+
+### 旧配置迁移规则
+
+启动 TUI 时会逐目录检查旧主配置：
+
+- 迁移检查覆盖全局主配置、从当前目录向上发现的项目主配置、配置目录中的主配置，以及 `OPENCODE_CONFIG` 指定文件。
+- 同目录已存在目标 `tui.json` 时，整个目录跳过迁移；只有 `tui.jsonc` 不会触发跳过。
+- 目标不存在时，识别 `theme` 字符串和 `keybinds` 对象；旧 `tui` 的 `scroll_speed`、`scroll_acceleration`、`diff_style` 会在迁移阶段直接按对应 Schema 解码，无效值不会写入新的扁平 `tui.json`。生成文件加载时还会执行完整 Schema 校验。
+- 新文件写入成功后，先创建 `<原主配置>.tui-migration.bak`；备份已存在则复用，不覆盖。
+- 只有备份成功后才删除原主配置中的三个旧字段。迁移不是事务操作：新 `tui.json` 写入后，即使备份或原配置回写失败也不会回滚；此时旧字段可能仍在，且下次启动会因目标文件已存在而跳过，不会自动重试。
+- 无论迁移是否发生，主配置加载器都会忽略 `theme`、`keybinds` 和 `tui`。
 
 ---
 
@@ -173,14 +208,14 @@ Provider 对象本身还支持以下字段：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `description` | string | Agent 的简短描述，显示在 `/agent` 列表中。 |
+| `description` | string | Agent 的简短描述，显示在 `/agents` 列表和 Agent 选择界面中。 |
 | `mode` | enum | Agent 类型。`"primary"`(独立模式), `"subagent"`(子代理), `"all"`。 |
 | `model` | string | 该 Agent 专用的模型 ID。 |
 | `variant` | string | 默认模型变体（仅在使用该 Agent 配置的模型时生效）。 |
 | `prompt` | string | System Prompt (人设指令)。 |
-| `temperature` | number | 温度系数 (0.0 - 1.0)。 |
-| `top_p` | number | 核采样参数 (0.0 - 1.0)。 |
-| `steps` | number | 最大自动迭代步数。 |
+| `temperature` | 有限 number | 温度系数；可用范围由模型和 Provider 决定，OpenCode Schema 不统一限制为 0–1。 |
+| `top_p` | 有限 number | 核采样参数；可用范围由模型和 Provider 决定，OpenCode Schema 不统一限制为 0–1。 |
+| `steps` | 正整数 | 最大自动迭代步数；达到上限后输出最终纯文本响应。 |
 | `color` | string | 在界面中显示的颜色 (Hex 格式，如 `#FF0000`)，或主题色名（如 `primary`）。 |
 | `hidden` | boolean | 是否在 `@` 自动补全菜单中隐藏此 Agent。 |
 | `permission` | object | 该 Agent 的专用权限配置 (覆盖全局权限)。 |
@@ -193,14 +228,14 @@ Provider 对象本身还支持以下字段：
 控制 OpenCode 访问系统资源的权限。
 
 **键名**：`permission` (单数)  
-**类型**：`Record<string, Rule | Action>`
+**类型**：已知权限键按下方两组校验；额外自定义权限键可使用 `Rule`
 
 值可以是以下字符串之一（Action）：
 - `"allow"`: 自动允许
 - `"ask"`: 每次询问
 - `"deny"`: 拒绝
 
-也可以是对象（Rule）进行更细粒度控制。
+支持对象规则（Rule）的权限键可以按命令或路径模式做更细粒度控制。
 
 ```json
 "permission": {
@@ -213,24 +248,15 @@ Provider 对象本身还支持以下字段：
 }
 ```
 
-**可用权限项**：
-- `read`: 读取文件
-- `edit`: 编辑/写入文件
-- `bash`: 执行命令
-- `glob`: 文件查找
-- `grep`: 内容搜索
-- `list`: 列出目录
-- `task`: 调用子 Agent
-- `external_directory`: 访问外部目录
-- `todowrite`: TODO 写入
-- `todoread`: TODO 读取
-- `question`: 提问工具
-- `webfetch`: 访问网页
-- `websearch`: 搜索引擎
-- `codesearch`: 代码搜索
-- `lsp`: LSP 操作
-- `doom_loop`: 死循环检测
-- `skill`: 技能调用
+**支持 `Rule` 或 `Action`**：
+- `read`、`edit`、`glob`、`grep`、`list`
+- `bash`、`task`、`external_directory`、`lsp`、`skill`
+
+**仅支持 `Action`**：
+- `todowrite`、`question`
+- `webfetch`、`websearch`、`doom_loop`
+
+额外的自定义权限键可以使用对象规则（Rule）。
 
 ---
 
@@ -260,18 +286,23 @@ Provider 对象本身还支持以下字段：
 
 ---
 
-## 快捷键配置 (keybinds)
+## 快捷键配置 (tui.json → keybinds)
 
 自定义快捷键。
 
-**键名**：`keybinds` (**复数**)
+**键名**：`keybinds` (**复数**，位于 `tui.json` 顶层)
 
-```json
-"keybinds": {
-  "leader": "ctrl+x",
-  "session_new": "<leader>n"
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session_new": "<leader>n"
+  }
 }
 ```
+
+绑定值可设为 `"none"` 或 `false` 来禁用，也可使用单个绑定或绑定数组。
 
 常用配置项（完整列表见[快捷键速查](./keybinds.md)）：
 
@@ -411,22 +442,15 @@ Provider 对象本身还支持以下字段：
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-02-14
+> 目标版本：v1.18.22（commit `47b6b6f5f4f9b42d2bce7af1c4e5bf6efaf22ba7`）
 
-所有配置 Schema 定义均在 `packages/opencode/src/config/config.ts` 文件中。
-
-| 配置项 | 对应 Schema | 行号范围 |
-|--------|------------|----------|
-| 顶层 Info | `Info` | L1004-L1197 |
-| Provider | `Provider` | L951-L1001 |
-| Agent | `Agent` | L672-L758 |
-| Permission | `Permission` | L621-L652 |
-| Keybinds | `Keybinds` | L761-L917 |
-| TUI | `TUI` | L919-L931 |
-| Server | `Server` | L933-L944 |
-| Command | `Command` | L654-L661 |
-| Skills | `Skills` | L663-L670 |
-| MCP | `Mcp` | L523-L584 |
-| Experimental | `experimental` | L1172-L1192 |
+| 配置范围 | 固定版本源码 |
+|----------|--------------|
+| 主配置 Schema | [`packages/core/src/v1/config/config.ts` L32-L190](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L32-L190) |
+| 主配置过滤旧 TUI 字段 | [`packages/opencode/src/config/config.ts` L53-L61](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L53-L61) |
+| TUI Schema | [`packages/tui/src/config/index.tsx` L61-L75](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) |
+| 快捷键值与默认映射 | [`packages/tui/src/config/keybind.ts` L28-L159](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L28-L159) |
+| TUI 自动迁移 | [`packages/opencode/src/config/tui-migrate.ts` L24-L132](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L132) |
+| TUI 加载层级 | [`packages/opencode/src/config/tui.ts` L171-L209](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) |
 
 </details>

@@ -1,13 +1,13 @@
 ---
-title: "CLI Command Reference"
-description: "Complete reference for OpenCode command line tool"
+title: "OpenCode CLI: Complete Command Reference | Tutorial"
+description: "Learn the OpenCode CLI. This reference covers interactive and Mini modes, automation, servers, session management, security, and environment variables."
 ---
 
 # CLI Command Reference
 
 > All commands and options for the `opencode` CLI tool
 
-## Course Notes
+## 📝 Course Notes
 
 Key takeaways from this lesson:
 
@@ -22,6 +22,7 @@ Key takeaways from this lesson:
 | Command | Function |
 |---------|----------|
 | `opencode` | Start TUI interactive interface |
+| `opencode --mini` | Start the minimal interactive interface |
 | `opencode run` | Execute tasks in non-interactive mode |
 | `opencode serve` | Start headless server |
 | `opencode web` | Start Web interface |
@@ -60,6 +61,10 @@ opencode [project]
 | `--prompt` | | Initial prompt |
 | `--model` | `-m` | Specify model (format: provider/model) |
 | `--agent` | | Specify Agent |
+| `--auto` | | Automatically approve permission requests that are not explicitly denied (dangerous) |
+| `--mini` | | Start the minimal interactive interface |
+| `--no-replay` | | Do not replay history when Mini continues a session or the terminal is resized |
+| `--replay-limit` | | Replay at most the most recent N messages in Mini |
 | `--port` | | Listen port |
 | `--hostname` | | Listen address |
 
@@ -76,7 +81,17 @@ opencode -m anthropic/claude-sonnet-4-20250514
 
 # Continue last session
 opencode -c
+
+# Start Mini; continuing a session replays history by default
+opencode --mini -c
+
+# Continue a session without replaying history
+opencode --mini -c --no-replay
 ```
+
+Mini is launched with `opencode --mini`, not `opencode run --mini`. Enter `!` at the beginning of the Mini input to switch to Shell mode. Press <kbd>Esc</kbd> to exit immediately, or press <kbd>Backspace</kbd> while the cursor is at the start of the input.
+
+`--auto` applies to the standard TUI. The target version still accepts the hidden `--yolo` compatibility alias, but new scripts should use the public `--auto` option. The Mini entry point does not forward this automatic-approval switch.
 
 ---
 
@@ -103,6 +118,7 @@ opencode run [message..]
 | `--attach` | | Connect to running server (e.g. `http://localhost:4096`) |
 | `--port` | | Local server port (random by default) |
 | `--variant` | | Model variant (reasoning effort: high, max, minimal) |
+| `--auto` | | Automatically approve permission requests that are not explicitly denied (dangerous) |
 
 **Examples:**
 ```bash
@@ -139,7 +155,12 @@ opencode run --title "Bug Fix" "Fix the login issue"
 
 # Read input from stdin
 echo "Count lines of code" | opencode run "Analyze"
+
+# Run non-interactively and automatically approve permissions that would otherwise prompt
+opencode run --auto "Run the tests and fix any failures"
 ```
+
+`opencode run` is non-interactive by default. The hidden `--yolo` option remains compatible with `--auto` in the target version but should not be used in new scripts. Both options approve only requests that would otherwise prompt; rules configured as `deny` still block execution.
 
 ---
 
@@ -668,3 +689,16 @@ API keys for each provider are set via corresponding environment variables:
 - [Configuration Reference](/en/appendix/config-ref) - Detailed configuration file reference
 - [Slash Commands Cheat Sheet](/en/appendix/commands) - Commands within TUI
 - [Model Providers List](/en/appendix/providers) - Available models
+
+## Source Code Reference
+
+The following behavior is pinned to [`v1.18.22`](https://github.com/anomalyco/opencode/tree/v1.18.22):
+
+| Behavior | Source | Lines |
+| --- | --- | --- |
+| `run` defaults to non-interactive mode; Mini entry point | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L3-L15) | 3-15 |
+| `--mini`, replay, and `--no-replay` | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L123-L175) | 123-175 |
+| `--auto` and the hidden compatibility alias | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L242-L274) | 242-274 |
+| Automatic-approval option for the standard TUI | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L108-L121) | 108-121 |
+| Mapping the standard TUI automatic-approval option | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L287-L295) | 287-295 |
+| Mini Shell mode | [`packages/opencode/src/cli/cmd/run/footer.prompt.tsx`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run/footer.prompt.tsx#L1055-L1094) | 1055-1094 |

@@ -53,6 +53,8 @@ prerequisite:
 
 编辑器启动 `opencode acp` 作为子进程，通过 stdin/stdout 使用 nd-JSON（newline-delimited JSON）格式进行 JSON-RPC 通信。
 
+部分过渡版本的 Release 把这套新实现称为 `acp-next`；到 `v1.18.22`，它已经成为正式的 `opencode acp` 实现，不存在需要另行启动的 `opencode acp-next` 命令。源码：[ACP 命令入口](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/acp.ts#L9-L25)、[当前 Agent 实现](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/agent.ts#L32-L85)。
+
 ---
 
 ## 启动 ACP 服务
@@ -74,6 +76,8 @@ opencode acp
 ---
 
 ## Zed 配置
+
+OpenCode 仓库过去曾捆绑 Zed 扩展，但该扩展已移除。`v1.18.22` 应通过 Zed 的 ACP `agent_servers` 配置启动 `opencode acp`，不要再寻找或安装仓库内的旧捆绑扩展。
 
 添加到 [Zed](https://zed.dev) 配置文件 `~/.config/zed/settings.json`：
 
@@ -215,20 +219,24 @@ require("codecompanion").setup({
 
 ## 支持的功能
 
-通过 ACP 使用 OpenCode，功能与终端版完全相同：
+`v1.18.22` 的 ACP 实现不等同于完整 TUI，但已覆盖核心会话能力：
 
 | 功能 | 支持 |
 |------|------|
-| 内置工具（文件操作、终端命令等） | ✅ |
-| 自定义工具和斜杠命令 | ✅ |
-| MCP 服务器 | ✅ |
-| `AGENTS.md` 项目规则 | ✅ |
-| 自定义格式化器 | ✅ |
-| Agent 和权限系统 | ✅ |
+| 发送提示并流式返回消息、工具调用和权限请求 | ✅ |
+| 发现并执行当前可用的斜杠命令 | ✅ |
+| 新建、列出、加载、重放、恢复和关闭会话 | ✅ |
+| 取消正在运行的提示 | ✅ |
+| 选择模型 | ✅ |
+| 选择 Agent（ACP 中显示为 Session Mode） | ✅ |
+| 选择模型 variant（ACP 中显示为 Effort） | ✅ |
+| 注册客户端传入的 MCP 服务器 | ✅ |
+
+Agent 入口方法见 [`acp/agent.ts:43-84`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/agent.ts#L43-L84)；会话加载、消息重放和命令发送见 [`acp/service.ts:211-235`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/service.ts#L211-L235)、[`acp/service.ts:494-543`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/service.ts#L494-L543)；模型、Effort 与 Session Mode 选项见 [`acp/config-option.ts:38-109`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/config-option.ts#L38-L109)。
 
 ### 不支持的功能
 
-以下 TUI 专用命令在 ACP 模式下不可用：
+不要把 TUI 命令列表等同于 ACP slash command 列表。以下 TUI 专用命令在 ACP 模式下不可用：
 
 - `/undo` - 撤销消息
 - `/redo` - 重做消息

@@ -7,7 +7,7 @@ lesson: "5.11a"
 duration: 30 分钟
 practice: 35 分钟
 level: 进阶
-description: 对接公司统一认证，把登录时保存的 token 注入到 OpenCode 进程环境变量，并下发组织默认配置（短期 token 用插件实现续期）。
+description: 对接公司统一认证，把登录时保存的 token 注入配置变量替换映射，并下发组织默认配置（短期 token 用插件实现续期）。
 tags:
   - 企业
   - 认证
@@ -38,7 +38,7 @@ prerequisite:
 
 1）环境变量：你们自己注入 Token，OpenCode 读取即可
 
-2）well-known：登录时执行一次 `auth.command` 保存 token；后续启动只注入已保存 token + 拉取组织默认配置（不自动续期）
+2）well-known：登录时执行一次 `auth.command` 保存 token；后续启动注入已保存 token，并加载内嵌 `config` 或 `remote_config` 指向的独立 JSON（不自动续期）
 
 3）认证插件：需要 OAuth/刷新/签名/改 headers/params 时，用插件实现
 
@@ -93,8 +93,8 @@ OpenCode 的 Provider 最终需要的通常就是一段字符串：API Key、Bea
 
 OpenCode 有一个很适合企业内网的入口：`opencode auth login <url>`。
 
-- 它会请求 `<url>/.well-known/opencode`，读到 `auth.command` 和 `auth.env`，然后在本机执行 `auth.command` 取回 Token 并保存（源码：`packages/opencode/src/cli/cmd/auth.ts`）。
-- OpenCode 启动加载配置时，如果发现你保存过这种 `type: "wellknown"` 的凭据，它会在运行时设置 `process.env[auth.env]=token`，并把 `<url>/.well-known/opencode` 里的 `config` 当成“组织默认配置”合并进来（源码：`packages/opencode/src/config/config.ts`）。
+- 它会请求 `<url>/.well-known/opencode`，读到 `auth.command` 和 `auth.env`，然后在本机执行 `auth.command` 取回 Token 并保存（源码：[`providers.ts:325-350`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/providers.ts#L325-L350)）。
+- OpenCode 启动加载配置时，如果发现你保存过这种 `type: "wellknown"` 的凭据，会把 token 放进仅供配置变量替换使用的环境映射，并合并 `<url>/.well-known/opencode` 里的 `config`。如果响应包含 `remote_config`，还会拉取其 `url` 指向的独立 JSON；远程 JSON 的字段覆盖内嵌 `config`（源码：[`config.ts:356-393`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L393)）。
 
 企业里最常见的对接方式，其实有 3 种（按“需要你改多少东西”从少到多）：
 
@@ -110,9 +110,10 @@ OpenCode 在企业场景里约定了一个端点：`/.well-known/opencode`。
 它返回一个 JSON，通常包含两块：
 
 - `auth`：告诉 OpenCode 用什么命令拿到 Token（`auth.command`），以及把 Token 注入到哪个环境变量（`auth.env`）
-- `config`：组织默认配置（会被合并进 OpenCode 的配置系统）
+- `config`：直接内嵌的组织默认配置
+- `remote_config`：可选，使用 `{ "url": "...", "headers": { ... } }` 指向独立配置 JSON；URL 和 header 值支持配置变量替换
 
-注意：OpenCode 会直接运行 `auth.command`（源码：`packages/opencode/src/cli/cmd/auth.ts`）。而且启动时也会拉取 `config` 并合并（源码：`packages/opencode/src/config/config.ts`）。
+注意：OpenCode 会直接运行 `auth.command`，而且启动时也会拉取 `config` / `remote_config` 并合并。只应信任可控的企业域名。
 
 `config` 里如果包含 `plugin`，OpenCode 可能会自动安装插件包并 `import()` 执行（源码：`packages/opencode/src/plugin/index.ts`）。
 
@@ -120,11 +121,11 @@ OpenCode 在企业场景里约定了一个端点：`/.well-known/opencode`。
 :::
 
 ::: details 📦 well-known 下发的是“默认值”，不是“强制策略”
-OpenCode 的配置合并顺序（低 → 高）是：
+OpenCode v1 loader 的配置合并顺序（低 → 高）是：
 
 1）远程 `/.well-known/opencode`（组织默认）
 
-2）全局配置（`~/.config/opencode/{config.json,opencode.json,opencode.jsonc}`）
+2）全局配置（依次读取旧版 `config.json`、`opencode.json`、`opencode.jsonc`；新建全局配置默认写 `opencode.jsonc`）
 
 3）自定义配置路径（`OPENCODE_CONFIG`）
 
@@ -132,11 +133,13 @@ OpenCode 的配置合并顺序（低 → 高）是：
 
 5）`.opencode/` 目录配置（包含 `.opencode/opencode.json{,c}` 和 `.opencode/plugin/` 等）
 
-5.1）你也可以用 `OPENCODE_CONFIG_DIR` 指定一个额外的配置目录（它会被当成目录来源的一部分加载，源码：`packages/opencode/src/config/config.ts`）
+5.1）你也可以用 `OPENCODE_CONFIG_DIR` 指定一个额外的配置目录（它会被当成目录来源的一部分加载）
 
 6）内联配置（`OPENCODE_CONFIG_CONTENT`）
 
-（企业版）managed config 目录会覆盖以上所有来源（源码注释：`packages/opencode/src/config/config.ts`）。
+（企业版）managed config 目录会覆盖以上所有来源。
+
+`remote_config` 与内嵌 `wellknown.config` 在全局、项目和 `.opencode/` 之前加载，所以它们提供的是组织默认值，后续本地来源仍可覆盖。对应实现见 [`config.ts:356-429`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L429)；managed config 最后合并见 [`config.ts:525-534`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L525-L534)。
 
 所以 `wellknown.config` 更适合做“团队默认开箱体验”。
 
@@ -225,6 +228,8 @@ well-known 的 `auth.command` 只在你执行 `opencode auth login <url>` 时运
 后续启动 OpenCode 时，只会注入这份“已保存的 token”，不会自动刷新/续期。
 
 如果你们的 token 很短期（比如 1 小时过期），更适合走方式 C：用插件实现刷新/签名流程。
+
+如果受 SSO 保护的 well-known 或 `remote_config` 返回 HTML 登录页而不是 JSON，OpenCode 会把它识别为认证缺失或过期，并提示重新执行 `opencode auth login <url>`。该命令的 URL 登录路径不会先加载使用旧 token 的项目实例，因此可以直接完成重新认证。
 :::
 
 <img src="/images/5-advanced/11a-auth-wellknown-flow.mini.jpeg"
@@ -244,6 +249,15 @@ well-known 的 `auth.command` 只在你执行 `opencode auth login <url>` 时运
     "command": ["corpctl", "ai", "token", "--format=plain"],
     "env": "COMPANY_AI_TOKEN"
   },
+
+  // 可选：把组织配置放在独立服务中。远程 JSON 会覆盖下面同名的 config 字段
+  "remote_config": {
+    "url": "https://config.company.internal/opencode.json",
+    "headers": {
+      "Authorization": "Bearer {env:COMPANY_AI_TOKEN}"
+    }
+  },
+
   "config": {
     "$schema": "https://opencode.ai/config.json",
 
@@ -254,9 +268,11 @@ well-known 的 `auth.command` 只在你执行 `opencode auth login <url>` 时运
     "provider": {
       "corp-gateway": {
         "name": "Company AI Gateway",
-        "env": ["COMPANY_AI_TOKEN"],
         "api": "https://ai-gateway.company.internal/v1",
         "npm": "@ai-sdk/openai-compatible",
+        "options": {
+          "apiKey": "{env:COMPANY_AI_TOKEN}"
+        },
         "models": {
           "qwen2.5-72b": {
             "name": "Qwen 2.5 72B",
@@ -279,13 +295,13 @@ well-known 的 `auth.command` 只在你执行 `opencode auth login <url>` 时运
 
 ::: warning ⚠️ 关键点
 - `auth.command` 必须能在开发机/容器里运行；它的 stdout 会被当成 Token。
-- `auth.env` 是环境变量名。OpenCode 启动时会在当前进程里设置 `process.env[auth.env]=token`（不等同于写入你的系统全局环境变量）。
+- `auth.env` 是配置变量名。OpenCode 启动时把已保存 token 放进本次配置加载的虚拟环境映射，供 `{env:COMPANY_AI_TOKEN}` 替换使用；它不会修改当前进程或系统 shell 的 `process.env`。
 :::
 
 #### 3.2 用 `opencode auth login` 把凭据写入本机
 
 **为什么**  
-这一步会把 `type: "wellknown"` 的凭据落到本机的 `auth.json` 里。之后每次启动 OpenCode，它都会自动注入环境变量并拉取远程 `config`。
+这一步会把 `type: "wellknown"` 的凭据落到本机的 `auth.json` 里。之后每次启动 OpenCode，它都会把 token 提供给配置变量替换，并拉取远程 `config` / `remote_config`。
 
 ```bash
 opencode auth login https://ai.company.internal
@@ -322,6 +338,12 @@ opencode run -m corp-gateway/qwen2.5-72b "用 3 句话解释这段话的要点�
 
 **为什么**  
 当你们不是“跑命令吐 Token”，而是需要 OAuth、自动刷新、请求签名、动态改 headers/params，插件是最靠谱的落点。
+
+::: info v1 Provider 认证与 v2 connector 的边界
+当前兼容接口仍通过插件 `auth.methods` 声明 `api` 或 `oauth` 方法，`oauth` 可选择自动回调或手工输入授权码；`loader` 再把保存的凭据转换为 Provider 配置。类型定义见 [`packages/plugin/src/index.ts:88-180`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/index.ts#L88-L180)。
+
+`v1.18.22` 同时提供 v2 integration connector：一个 integration 可注册 `key`、`env`、`oauth` 方法，连接层负责保存和解析凭据，并可在 OAuth 凭据临近过期时调用 `refresh`。它是 v2 插件接口，不要把 `context.integration` 示例直接混进下面的 v1 `Plugin` 骨架。接口见 [`packages/plugin/src/v2/effect/integration.ts:15-62`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/effect/integration.ts#L15-L62)，连接与刷新流程见 [`packages/core/src/integration.ts:380-457`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/integration.ts#L380-L457)。
+:::
 
 #### 4.1 写一个认证插件骨架
 
@@ -406,10 +428,11 @@ opencode auth login
 
 | 现象 | 原因 | 解决 |
 |---|---|---|
-| 登录后在另一个终端里 `echo $COMPANY_AI_TOKEN` 没有值 | well-known 的 token 是在 OpenCode 启动时写入当前进程的 `process.env`，不会写进你的 `.zshrc/.bashrc` | 不影响 OpenCode 调用模型；用 `opencode run -m corp-gateway/...` 验证即可；如果你确实需要在 shell 里看到，得自己 `export COMPANY_AI_TOKEN=...` |
+| 登录后在另一个终端里 `echo $COMPANY_AI_TOKEN` 没有值 | well-known token 只进入配置变量替换映射，不会写入 `process.env` 或你的 `.zshrc/.bashrc` | 在 Provider 配置中使用 `options.apiKey: "{env:COMPANY_AI_TOKEN}"`；用 `opencode run -m corp-gateway/...` 验证 |
 | `opencode auth login` 直接报 404/2000+ | `/.well-known/opencode` 不可达 | 先用浏览器/curl 验证 URL 可访问 |
 | 提示 `Failed` / 没有 `Logged into ...` | `auth.command` 退出码非 0 | 确保命令能在当前机器运行，且 stdout 输出 Token |
-| OpenCode 启动时报错并退出 | 远程 well-known 拉取失败会抛错，中断配置加载 | 先保证 `<url>/.well-known/opencode` 可达；排障时可用 `opencode auth logout` 移除这条 URL 凭据再启动 |
+| 提示远程配置返回登录页 | well-known 或 `remote_config` 位于 SSO 后，保存的 token 已缺失或过期 | 按错误提示执行 `opencode auth login <url>` 重新认证 |
+| OpenCode 启动时报其他远程配置错误 | well-known / `remote_config` 不可达、返回非 JSON 或配置格式无效 | 检查远程端点和 JSON；必要时用 `opencode auth logout` 移除这条 URL 凭据再排障 |
 | `opencode auth login` 找不到你们的 provider | 你们的 provider 不在 models.dev 列表 | 选 `Other`，手动输入 provider id（例如 `corp-gateway`） |
 | 登录成功但配置不生效 | 只保存了 Token，没有返回 `config` | 在 well-known JSON 里补上 `config` 字段 |
 | 容器里能登录，本地不行（或反过来） | 命令/证书链差异 | 确保容器和本机都装了公司根证书，并且 `auth.command` 在两边都可用 |
@@ -442,16 +465,18 @@ opencode auth login
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-02-05
+> 基准版本：OpenCode `v1.18.22`
 
 | 功能 | 文件路径 | 行号 |
 |---|---|---|
-| `opencode auth login <url>`：拉取 `/.well-known/opencode` 并执行 `auth.command`，保存 `type: wellknown` 凭据 | [`src/cli/cmd/auth.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/auth.ts#L231-L252) | 231-252 |
-| 启动时加载 well-known：把 token 写入 `auth.env` 环境变量，并合并远程 `config` | [`src/config/config.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/config/config.ts#L62-L91) | 62-91 |
-| 认证信息存储结构（oauth/api/wellknown）与 `auth.json` 写入逻辑 | [`src/auth/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/auth/index.ts#L7-L69) | 7-69 |
-| 插件认证钩子 `auth` 的类型定义（`methods`/`loader`） | [`packages/plugin/src/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/index.ts#L37-L156) | 37-156 |
-| OpenCode 插件加载机制（内置插件 + 配置里的插件列表） | [`src/plugin/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/plugin/index.ts#L15-L90) | 15-90 |
-| `opencode run` 命令参数（`-m provider/model`） | [`src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/run.ts#L28-L94) | 28-94 |
+| well-known 的 `config` / `remote_config` Schema | [`packages/core/src/v1/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L22-L25) | 22-25 |
+| 登录 URL：执行 `auth.command` 并保存 well-known 凭据 | [`packages/opencode/src/cli/cmd/providers.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/providers.ts#L325-L350) | 325-350 |
+| `remote_config` URL 与 headers 的变量替换 | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L64-L98) | 64-98 |
+| well-known 远程配置加载及合并顺序 | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L429) | 356-429 |
+| 远程配置返回登录页时提示重新认证 | [`packages/opencode/src/cli/error.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/error.ts#L97-L106) | 97-106 |
+| 全局旧配置兼容与默认 `opencode.jsonc` | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L139-L147) | 139-147 |
+| 插件认证钩子 `auth` 的类型定义（`methods` / `loader`） | [`packages/plugin/src/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/index.ts#L88-L180) | 88-180 |
+| v2 integration connector 的方法与连接接口 | [`packages/plugin/src/v2/effect/integration.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/effect/integration.ts#L15-L62) | 15-62 |
 
 **关键类型**：
 - `Auth.WellKnown`：`{ type: "wellknown", key: string, token: string }`

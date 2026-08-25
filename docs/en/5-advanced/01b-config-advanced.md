@@ -6,7 +6,7 @@ stage: "Stage 5"
 lesson: "5.1b"
 duration: "20 min"
 level: "Advanced"
-description: "Master all OpenCode configuration options to build a fully customized development environment and AI tool."
+description: "Learn advanced OpenCode configuration, including tui.json migration, providers, references, permissions, Agents, MCP servers, and experimental features."
 tags:
   - "Configuration"
   - "JSON"
@@ -60,25 +60,36 @@ Key takeaways from this lesson:
 
 ### TUI Configuration
 
-```json
+TUI settings live in a separate `tui.json` or `tui.jsonc` file, with fields defined directly at the top level:
+
+```jsonc
 {
-  "tui": {
-    "scroll_speed": 3,
-    "scroll_acceleration": {
-      "enabled": true
-    },
-    "diff_style": "auto"
+  "$schema": "https://opencode.ai/tui.json",
+  "scroll_speed": 3,
+  "scroll_acceleration": {
+    "enabled": true
+  },
+  "diff_style": "auto",
+  "cursor": {
+    "style": "block",
+    "blinking": true
   }
 }
 ```
 
 | Field | Description | Default |
-|-------|-------------|---------|
+| --- | --- | --- |
 | `scroll_speed` | Scroll speed multiplier (minimum 0.001) | 3 |
 | `scroll_acceleration.enabled` | Enable macOS-style accelerated scrolling | false |
 | `diff_style` | Diff display style | `"auto"` |
+| `cursor.style` | Cursor shape: `block`, `underline`, `line`, or `default` | `"block"` when `cursor` is configured |
+| `cursor.blinking` | Whether the cursor blinks; has no effect when `style` is `default` | true when `cursor` is configured |
 
 > `scroll_acceleration.enabled` takes precedence over `scroll_speed`. When enabled, scroll_speed is ignored.
+
+The main configuration loader strips the legacy `theme`, `keybinds`, and `tui` fields. The migrator checks the old main configuration only when the TUI starts: if a `tui.json` already exists in the same directory, migration is skipped. Otherwise, it writes a new `tui.json`, creates or reuses `<original-file>.tui-migration.bak`, and then removes those three fields from the old main configuration. A `tui.jsonc` file by itself does not prevent migration.
+
+Standalone TUI configurations are merged in this order: the global configuration, `OPENCODE_TUI_CONFIG`, ordinary project configurations, `.opencode` configurations along the path, and `OPENCODE_CONFIG_DIR`. Later sources take precedence. Ordinary project files are applied from the root side toward the current directory, so files nearer the current directory win. Multiple `.opencode` directories are merged from the current side toward the root, so on conflicts the rootmost directory is loaded later and wins. `OPENCODE_CONFIG_DIR` is loaded last.
 
 `diff_style` options:
 - `"auto"` - Adapts based on terminal width
@@ -88,8 +99,9 @@ Key takeaways from this lesson:
 
 Customize keyboard shortcuts:
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "leader": "ctrl+x",
     "session_new": "<leader>n",
@@ -101,14 +113,15 @@ Customize keyboard shortcuts:
 }
 ```
 
-> Note: The config key is `keybinds` (**plural**!), unlike permission/agent which use singular.
+> Note: The configuration key is `keybinds` (**plural**) and lives at the top level of `tui.json`. This differs from the singular `permission` and `agent` keys in the main configuration.
 
 #### Leader Key
 
 Most shortcuts use a `leader` key prefix to avoid terminal conflicts:
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "leader": "ctrl+x"
   }
@@ -119,10 +132,11 @@ Default is `ctrl+x`. Press the leader key followed by the shortcut, e.g., `ctrl+
 
 #### Disabling Keybinds
 
-Set the value to `"none"` to disable:
+Set the value to `"none"` or `false` to disable a keybind:
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "session_compact": "none"
   }
@@ -132,20 +146,25 @@ Set the value to `"none"` to disable:
 #### Common Keybinds
 
 | Config Key | Default | Description |
-|------------|---------|-------------|
+| --- | --- | --- |
 | `app_exit` | `ctrl+c,ctrl+d,<leader>q` | Exit application |
 | `session_new` | `<leader>n` | New session |
 | `session_list` | `<leader>l` | Session list |
 | `session_interrupt` | `escape` | Interrupt current operation |
 | `session_compact` | `<leader>c` | Compact session |
+| `session_background` | `ctrl+b` | Move a synchronous subagent to the background |
 | `model_list` | `<leader>m` | Model list |
 | `agent_list` | `<leader>a` | Agent list |
 | `agent_cycle` | `tab` | Switch Agent |
 | `command_list` | `ctrl+p` | Command list |
 | `messages_undo` | `<leader>u` | Undo message |
 | `messages_redo` | `<leader>r` | Redo message |
+| `diff_open` | `none` | Open the Diff viewer (unbound by default) |
+| `prompt_skills` | `none` | Open the Skill picker (unbound by default) |
 
-For the complete keybinds list, see [Quick Reference/Keybinds](../appendix/keybinds).
+See [Quick Reference: Keybinds](/en/appendix/keybinds) for a list of commonly used shortcuts.
+
+> Source: [TUI configuration schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) and [flat keybinds and disabled values](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L28-L33).
 
 ### Server Configuration
 
@@ -164,7 +183,7 @@ Configure the server for `opencode serve` and `opencode web` commands:
 ```
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `port` | Listen port |
 | `hostname` | Listen address (defaults to `0.0.0.0` when mdns is enabled) |
 | `mdns` | Enable mDNS service discovery (LAN devices can discover) |
@@ -186,7 +205,7 @@ Control session sharing behavior:
 ```
 
 | Value | Description |
-|-------|-------------|
+| --- | --- |
 | `"manual"` | Manual sharing (default), use `/share` command |
 | `"auto"` | Automatically share new sessions |
 | `"disabled"` | Disable sharing feature |
@@ -206,7 +225,7 @@ Control context compaction behavior:
 ```
 
 | Field | Description | Default |
-|-------|-------------|---------|
+| --- | --- | --- |
 | `auto` | Auto-compact when context is full | true |
 | `prune` | Remove old tool outputs to save tokens | true |
 | `reserved` | Token buffer during compaction, reserves enough window to prevent overflow | - |
@@ -245,6 +264,33 @@ Supports glob patterns. Use cases:
 - Share team coding standards
 - Include subproject rules in monorepos
 
+### References Configuration
+
+Use `references` to add local directories or Git repositories to the project context:
+
+```jsonc
+{
+  "references": {
+    "design-system": {
+      "path": "../design-system",
+      "description": "Team component library and design standards"
+    },
+    "upstream": {
+      "repository": "https://github.com/example/upstream.git",
+      "branch": "main",
+      "description": "Upstream implementation reference",
+      "hidden": true
+    }
+  }
+}
+```
+
+Use `path` for local references and `repository` for Git references, with an optional `branch`. References with a `description` are added to the system context; `hidden: true` only hides them from `@` autocomplete. The old singular key, `reference`, is deprecated—use `references` instead.
+
+> `customize-opencode` is now a built-in Skill for safely changing OpenCode's own configuration, so you do not need to install it separately. Scout was briefly introduced earlier but removed before the target version; do not configure or depend on it.
+
+> Source: [references schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/config/reference.ts#L5-L21), [main configuration key and deprecated alias](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L44-L50), and the [built-in customize-opencode Skill](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L276-L284).
+
 ---
 
 ## Feature Configuration
@@ -278,7 +324,7 @@ Configure AI providers and their models:
 #### Provider-level Options
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `options.apiKey` | API key, supports `{env:VAR_NAME}` environment variable replacement |
 | `options.baseURL` | Custom API base URL (for proxies or private deployments) |
 | `options.timeout` | Request timeout (milliseconds), set to `false` to disable |
@@ -328,7 +374,7 @@ Control available models:
 ```
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `whitelist` | Only allow these models |
 | `blacklist` | Disable these models |
 
@@ -371,11 +417,11 @@ Disables all tools from the MCP server named `mymcp`.
 `tools` is a legacy configuration that automatically converts to `permission`:
 
 | tools setting | Equivalent permission |
-|---------------|----------------------|
+| --- | --- |
 | `"write": false` | `"edit": "deny"` |
 | `"bash": false` | `"bash": "deny"` |
 
-> Recommend using `permission` configuration for finer-grained control (allow/ask/deny). See [5.5 Permissions](./05-permissions).
+> We recommend using `permission` for finer-grained control (allow/ask/deny). See [5.5 Permissions](/en/5-advanced/05-permissions).
 
 ### Permission Configuration
 
@@ -397,7 +443,7 @@ Fine-grained permission control:
 
 > Note: The config key is `permission` (singular), not `permissions`.
 
-For detailed configuration, see [5.5 Permissions](./05-permissions).
+For detailed configuration, see [5.5 Permissions](/en/5-advanced/05-permissions).
 
 ### Agent Configuration
 
@@ -433,17 +479,17 @@ Configure Agent behavior:
 #### Advanced Configuration Fields
 
 | Field | Type | Description |
-|-------|------|-------------|
-| `temperature` | number | Creativity parameter (0-1), lower is more deterministic |
-| `top_p` | number | Nucleus sampling parameter (0-1) |
+| --- | --- | --- |
+| `temperature` | finite number | Creativity parameter; the valid range depends on the model and Provider |
+| `top_p` | finite number | Nucleus sampling parameter; the valid range depends on the model and Provider |
 | `variant` | string | Default model variant (only effective when using the model configured for this Agent) |
-| `steps` | number | Maximum iteration steps |
+| `steps` | positive integer | Maximum automatic iterations; once reached, the Agent returns a final plain-text response rather than continuing. This is not a tool-call limit |
 | `color` | string | Hex color (e.g., `#FF5733`) or theme color name (e.g., `primary`) |
 | `hidden` | boolean | Hide from @ menu (only effective for subagents) |
 
 > `maxSteps` is deprecated, use `steps` instead.
 
-For detailed configuration, see [5.2 Custom Agents](./02a-agent-quickstart).
+For detailed configuration, see [5.2 Custom Agents](/en/5-advanced/02a-agent-quickstart).
 
 ### Command Configuration
 
@@ -469,14 +515,14 @@ Define commands in the configuration file:
 > Note: The config key is `command` (singular), not `commands`.
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `template` | Command template, `$ARGUMENTS` represents the argument |
 | `description` | Command description |
 | `agent` | Agent to use |
 | `model` | Model to use |
 | `subtask` | Whether to run as a subtask |
 
-For detailed configuration, see [5.4 Custom Commands](./04-commands).
+For detailed configuration, see [5.4 Custom Commands](/en/5-advanced/04-commands).
 
 ### Formatter Configuration
 
@@ -509,7 +555,7 @@ Set to `false` to completely disable formatting:
 }
 ```
 
-For detailed configuration, see [5.18 Formatters](./18-formatters).
+For detailed configuration, see [5.18 Formatters](/en/5-advanced/18-formatters).
 
 ### MCP Configuration
 
@@ -540,7 +586,7 @@ Configure MCP servers:
 
 Remote MCP servers support `headers` (custom request headers) and `oauth` (OAuth authentication). Set `oauth` to `false` to disable automatic OAuth detection.
 
-For detailed configuration, see [5.7 MCP Extensions](./07a-mcp-basics).
+For detailed configuration, see [5.7 MCP Extensions](/en/5-advanced/07a-mcp-basics).
 
 ### Plugin Configuration
 
@@ -554,7 +600,7 @@ Load npm plugins:
 
 You can also place local plugins (`.ts` or `.js` files) in the `.opencode/plugin/` directory.
 
-For detailed configuration, see [5.12 Plugin System](./12a-plugins-basics).
+For detailed configuration, see [5.12 Plugin System](/en/5-advanced/12a-plugins-basics).
 
 ### LSP Configuration
 
@@ -581,7 +627,7 @@ Configure LSP servers:
 ```
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `disabled` | Disable this LSP |
 | `command` | Startup command |
 | `extensions` | File extensions (required for custom LSP) |
@@ -596,7 +642,7 @@ Set to `false` to disable all LSP:
 }
 ```
 
-For detailed configuration, see [5.19 LSP Servers](./19-lsp).
+For detailed configuration, see [5.19 LSP Servers](/en/5-advanced/19-lsp).
 
 ---
 
@@ -613,7 +659,7 @@ For detailed configuration, see [5.19 LSP Servers](./19-lsp).
 ```
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `batch_tool` | Enable batch tools |
 | `openTelemetry` | Enable OpenTelemetry tracing |
 | `disable_paste_summary` | Disable automatic summary when pasting large text |
@@ -624,12 +670,14 @@ For detailed configuration, see [5.19 LSP Servers](./19-lsp).
 > ⚠️ Experimental features may change or be removed at any time.
 
 ::: tip About Hooks
-Hook functionality is implemented through the **plugin system**, not the `experimental` configuration. See [5.12c Hooks](./12c-hooks).
+Hook functionality is implemented through the **plugin system**, not the `experimental` configuration. See [5.12c Hooks](/en/5-advanced/12c-hooks).
 :::
 
 ---
 
 ## Complete Configuration Example
+
+Main configuration, `opencode.jsonc`:
 
 ```jsonc
 {
@@ -663,17 +711,6 @@ Hook functionality is implemented through the **plugin system**, not the `experi
   
   // === User ===
   "username": "Developer",
-  
-  // === Interface ===
-  "theme": "catppuccin",
-  "tui": {
-    "scroll_speed": 3,
-    "diff_style": "auto"
-  },
-  "keybinds": {
-    "leader": "ctrl+x",
-    "session_new": "<leader>n"
-  },
   
   // === Server ===
   "server": {
@@ -739,18 +776,33 @@ Hook functionality is implemented through the **plugin system**, not the `experi
 }
 ```
 
+Interface configuration, `tui.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "catppuccin",
+  "scroll_speed": 3,
+  "diff_style": "auto",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session_new": "<leader>n"
+  }
+}
+```
+
 ---
 
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-------|-------|----------|
-| Used `keybind` | Wrong key name | Should be `keybinds` (**plural**) |
+| --- | --- | --- |
+| Used `keybind` | Wrong key name | Use `keybinds` (**plural**) in `tui.json` |
 | Used `permissions` | Wrong key name | Should be `permission` (singular) |
 | Used `agents` | Wrong key name | Should be `agent` (singular) |
 | Used `commands` | Wrong key name | Should be `command` (singular) |
 | Used `formatters` | Wrong key name | Should be `formatter` (singular) |
-| Used `tui.theme` | Wrong key name | Use `theme` directly |
+| Put `theme` / `keybinds` / `tui` in the main configuration | Wrong configuration file | Move them to a sibling `tui.json` / `tui.jsonc` file |
 | tools config not working | Legacy config | Recommend using `permission` |
 | baseURL not working | Wrong location | Should be in `provider.options.baseURL`, not top-level |
 | Model API URL not working | Wrong field | Model-level uses `provider.api`, Provider-level uses `options.baseURL` |
@@ -762,14 +814,14 @@ Hook functionality is implemented through the **plugin system**, not the `experi
 ## Config Key Quick Reference
 
 | Config Item | Correct Key | Common Mistake |
-|-------------|-------------|----------------|
+| --- | --- | --- |
 | Provider | `provider` | ~~providers~~ |
 | Permission | `permission` | ~~permissions~~ |
 | Agent | `agent` | ~~agents~~ |
 | Command | `command` | ~~commands~~ |
 | Formatter | `formatter` | ~~formatters~~ |
-| **Keybinds** | `keybinds` | ~~keybind~~ |
-| Theme | `theme` | ~~tui.theme~~ |
+| **Keybinds (TUI configuration)** | `keybinds` | ~~keybind~~ |
+| Theme (TUI configuration) | `theme` | ~~tui.theme~~ |
 
 ---
 
@@ -777,9 +829,9 @@ Hook functionality is implemented through the **plugin system**, not the `experi
 
 You learned:
 
-1. Interface configuration: TUI, keybinds, server
+1. Standalone TUI interface settings and keybinds, plus server settings in the main configuration
 2. Behavior configuration: share, compaction, watcher, instruction files
-3. Feature configuration: Provider, tools, permissions, agents, commands, formatters, MCP, plugins, LSP
+3. Feature configuration: Provider, references, tools, permissions, agents, commands, formatters, MCP, plugins, and LSP
 4. Experimental features: batch tools, OpenTelemetry, etc.
 5. Custom model API URLs (v1.1.60+)
 
@@ -787,13 +839,13 @@ You learned:
 
 ## Related Resources
 
-- [5.1a Configuration Basics](./01a-config-basics) - Core configuration
-- [5.2 Custom Agents](./02a-agent-quickstart) - Detailed Agent configuration
-- [5.4 Custom Commands](./04-commands) - Detailed Command configuration
-- [5.5 Permissions](./05-permissions) - Detailed Permission configuration
-- [5.7 MCP Extensions](./07a-mcp-basics) - Detailed MCP configuration
-- [Quick Reference/Keybinds](../appendix/keybinds) - Complete keybinds list
-- [Quick Reference/Config Reference](../appendix/config-ref) - Configuration cheat sheet
+- [5.1a Configuration Basics](/en/5-advanced/01a-config-basics) - Core configuration
+- [5.2 Custom Agents](/en/5-advanced/02a-agent-quickstart) - Detailed Agent configuration
+- [5.4 Custom Commands](/en/5-advanced/04-commands) - Detailed Command configuration
+- [5.5 Permissions](/en/5-advanced/05-permissions) - Detailed Permission configuration
+- [5.7 MCP Extensions](/en/5-advanced/07a-mcp-basics) - Detailed MCP configuration
+- [Quick Reference: Keybinds](/en/appendix/keybinds) - Common keybinds
+- [Quick Reference: Configuration](/en/appendix/config-ref) - Configuration cheat sheet
 
 ---
 

@@ -488,6 +488,8 @@ You can think of them as three groups:
 OpenCode registers MCP tools in the format `server_name + underscore + tool_name`.
 
 So if your configured server name is `chrome-devtools`, the final tool names become `chrome-devtools_list_pages`, `chrome-devtools_take_snapshot`, and so on. This avoids naming collisions between tools from different MCP servers.
+
+`v1.18.22` restored and continues to use this legacy format. The `mcp__chrome-devtools__list_pages` form appeared briefly during development, but it is not the naming convention used by the target release. Do not change permission rules or prompts based on it.
 :::
 
 ---
@@ -587,8 +589,8 @@ You learned:
 
 ## Related Resources
 
-- [5.7a MCP Basics](./07a-mcp-basics) - Introductory MCP configuration
-- [5.7b MCP Advanced](./07b-mcp-advanced) - OAuth authentication and permission management
+- [5.7a MCP Basics](/en/5-advanced/07a-mcp-basics) - Introductory MCP configuration
+- [5.7b MCP Advanced](/en/5-advanced/07b-mcp-advanced) - OAuth authentication and permission management
 - [Official Chrome DevTools MCP documentation](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session)
 - [Chrome DevTools MCP GitHub](https://github.com/ChromeDevTools/chrome-devtools-mcp)
 
@@ -605,17 +607,16 @@ You learned:
 <details>
 <summary><strong>Click to expand source locations</strong></summary>
 
-> Last updated: 2026-03-15
+> Corresponding version: OpenCode v1.18.22
 
 | Feature | File path | Lines |
 | --- | --- | --- |
-| MCP connection entry point | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L328-L531) | 328-531 |
-| Local MCP launch commands and environment variables | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L445-L487) | 445-487 |
-| MCP status definitions (`connected` / `disabled` / `failed` / `needs_auth` / `needs_client_registration`) | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L66-L109) | 66-109 |
-| MCP tool naming rules (server name prefix) | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L603-L643) | 603-643 |
-| `opencode mcp list` command | [`src/cli/cmd/mcp.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/mcp.ts#L67-L136) | 67-136 |
-| `opencode mcp add` command | [`src/cli/cmd/mcp.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/mcp.ts#L418-L579) | 418-579 |
-| MCP config schema (`local` / `remote` / `oauth` / `timeout`) | [`src/config/config.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/config/config.ts#L516-L576) | 516-576 |
+| Client capabilities and roots | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L38-L80) | 38-80 |
+| Workspace-relative `cwd` for local MCP servers | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L340-L357) | 340-357 |
+| MCP tool naming rules (server-name prefix) | [`src/mcp/catalog.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/catalog.ts#L117-L119) | 117-119 |
+| Server-instruction injection | [`src/session/system.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L119-L134) | 119-134 |
+| MCP resource/template tools | [`src/session/tools.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L27-L31) | 27-31 |
+| Local/remote MCP configuration schema | [`src/v1/config/mcp.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/mcp.ts#L6-L23) | 6-23 |
 
 **Key constant**:
 - `DEFAULT_TIMEOUT = 30000`: default timeout for MCP connections (30 seconds)

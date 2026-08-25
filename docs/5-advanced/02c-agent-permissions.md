@@ -107,7 +107,6 @@ Agent 级别 permission
 | `external_directory` | - | 访问项目目录之外的路径 |
 | `doom_loop` | - | 检测重复调用（同一工具连续调用 3 次相同输入） |
 | `question` | - | 向用户提问（默认 deny，防止 subagent 打扰用户） |
-| `plan_enter` | - | 进入计划模式（保留为权限键，但无对应工具实现；用户通过 Tab 键切换到 plan agent） |
 | `plan_exit` | - | 退出计划模式，切换到 build agent |
 
 > 来源：`packages/core/src/v1/config/permission.ts:17-36`
@@ -340,6 +339,7 @@ Task 工具的完整参数定义如下：
 | `subagent_type` | string | 是 | 要调用的子代理名称（必须是非 primary agent） |
 | `task_id` | string | 否 | 继续之前的任务；传入上次返回的 `task_id` 后，会复用同一个子代理会话 |
 | `command` | string | 否 | 触发此任务的命令（用于调试） |
+| `background` | boolean | 否 | 在后台运行；需启用 `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true` |
 
 ### 执行流程
 
@@ -355,7 +355,7 @@ TaskTool 的工作流程如下：
      2. 创建子会话
         - 在主会话下创建独立 session
         - 标题：描述 + (@subagent subagent)
-        - 应用限制权限（todowrite/task）
+        - 使用子代理自己的权限，并继承父会话 deny 与 external_directory 规则
        ↓
     3. 调用子代理
        - 子代理在独立 session 中执行
@@ -370,14 +370,23 @@ TaskTool 的工作流程如下：
 
 > **关键点**：子代理运行在**独立的 Session** 中，看不到主 Agent 的对话历史。调用时必须提供完整上下文。
 
-### 子代理的默认限制
+### 后台执行与嵌套深度
 
-为了防止无限递归，子代理（无论通过 task 调用还是 `@` 手动调用）受到以下**硬编码限制**：
+后台子代理仍是实验功能。启用后，Task tool 可传 `background: true`；TUI 也可以把当前阻塞会话的同步子代理转到后台，完成结果会自动通知父会话，不应轮询进度。
 
-| 限制 | 说明 | 原因 |
-|------|------|------|
-| `todowrite: deny` | 禁止读写待办列表 | 防止子代理干扰主 Agent 任务管理 |
-| `task: deny` | 禁止再调用子代理 | 防止无限递归 |
+```bash
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+```
+
+子代理嵌套深度由顶层 `subagent_depth` 控制，默认是 `1`，即默认不允许子代理继续创建子代理。需要嵌套时，应同时提高深度并在对应子代理自己的权限中显式配置 `task`：
+
+```jsonc
+{
+  "subagent_depth": 2
+}
+```
+
+> 来源：[`runtime-flags.ts:43`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L43)、[`task.ts:43-61`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L43-L61)、[`task.ts:96-117`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L96-L117)、[`config.ts:84-86`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L84-L86)
 
 ### 实际使用示例
 
@@ -430,7 +439,7 @@ TaskTool(
 )
 ```
 
-> **来源**：`packages/opencode/src/tool/task.ts:43-172`
+> **来源**：[`packages/opencode/src/tool/task.ts:43-172`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L43-L172)
 
 ---
 
@@ -540,22 +549,21 @@ OpenCode 默认配置了一些安全规则：
 - **`plan_enter`**：进入计划模式（保留为权限键，但源码中无对应工具实现；用户通过 Tab 键切换到 plan agent 进入）
 - **`plan_exit`**：退出计划模式，切换到 build agent（有 `PlanExitTool` 工具实现）
 
-默认均为 `deny`。build 额外允许 `plan_enter`（用于切到 plan），plan 额外允许 `plan_exit`（用于切回 build）。
+目标版本没有 `plan_enter` 工具，所以保留同名权限键也不能让 Build Agent 主动切换。Plan Agent 的 `plan_exit` 用于请求回到 Build，并按正常权限规则求值。
 
 ```jsonc
 {
   "agent": {
-    "build": {
+    "plan": {
       "permission": {
-        "plan_enter": "allow",   // build agent 允许切换到 plan
-        "plan_exit": "deny"      // 不允许退出（只有 plan agent 可以）
+        "plan_exit": "allow"      // 允许 Plan Agent 请求回到 Build
       }
     }
   }
 }
 ```
 
-> 来源：`agent.ts:127-128,149,164`、`plan.ts`
+> 来源：[`plan.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/plan.ts#L13-L79)、[`registry.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L215-L248)
 
 ### 废弃字段：tools
 
@@ -593,32 +601,24 @@ OpenCode 默认配置了一些安全规则：
 
 **迁移说明**：
 - `tools` 中的 `write`/`edit`/`patch` 映射到 `edit` 权限
-- `multiedit` 等其他工具名不在此映射列表中，会作为独立的 permission 键处理
+- 其他旧工具名可能被转换为同名 permission 键，但目标版本没有对应工具时不会产生可调用能力
 - `true` → `"allow"`，`false` → `"deny"`
 - 系统会自动转换旧配置，但建议手动更新
 
 > 来源：`packages/core/src/v1/config/agent.ts:71-76`
 
-### 子代理的隐式限制
+### 子代理权限继承
 
-除了配置的权限外，子代理（无论 subagent 还是被调用的 all 模式）还受到以下**硬编码限制**：
+通过 Task tool 创建子会话时，能力以**子代理自己的权限**为基础，不会继承父 Agent 的 `allow` / `ask`。为避免子代理绕过父会话的安全边界，还会继承父会话的所有 `deny` 规则和全部 `external_directory` 规则。
 
-1. **Todo 工具禁用**
-   - 子代理**永远无法使用** `todowrite`。
-   - 这是为了防止子代理干扰主 Agent 的任务列表管理。
+此外还有两项默认拒绝：
 
-2. **主代理专属工具禁用**
-   - 配置在 `primary_tools` 中的工具，子代理无法使用。
+- 如果子代理自己的规则没有配置 `todowrite`，自动追加 `todowrite: deny`。
+- 如果子代理自己的规则没有配置 `task`，自动追加 `task: deny`。
 
-3. **Task 嵌套限制**
-   - 子代理默认**不能**再调用其他子代理（除非显式授予 `task` 权限）。
-   - 例如：`explore` 无法调用 `general`，因为它的默认权限是 `*: deny`。
+这两项不是不可覆盖的硬编码禁用。显式配置对应权限后仍需满足 `subagent_depth`。配置在 `experimental.primary_tools` 中的工具则会继续对 Task 子会话追加 deny。
 
-   **为什么这样设计？**
-   - **防止无限递归**：避免子 agent 之间形成循环调用链，导致任务永远无法结束
-   - **控制复杂度**：让任务执行路径更可预测、更易调试
-   - **资源管控**：每次调用子 agent 都会创建新 session，消耗 token 和计算资源
-   - **职责分离**：子 agent 应专注做一件事，编排工作交给主 agent
+> 来源：[`subagent-permissions.ts:4-26`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/agent/subagent-permissions.ts#L4-L26)、[`task.ts:139-170`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L139-L170)
 
 ---
 
@@ -782,10 +782,10 @@ permission:
 你学会了：
 
 1. **权限系统架构**：三种动作、配置层级、最后匹配获胜
-2. **15+ 权限类型**：bash、edit、task、skill、question、plan_enter、plan_exit 等
+2. **常用权限类型**：bash、edit、task、skill、question、plan_exit 等
 3. **细粒度控制**：使用对象语法和通配符
 4. **TaskTool 机制**：子代理调用、参数定义、执行流程
-5. **子代理限制**：todowrite/task 禁用，防止无限递归
+5. **子代理边界**：使用自身权限，继承父会话 deny / external_directory，并受默认深度限制
 6. **内置安全规则**：.env 保护、doom_loop、external_directory
 7. **安全最佳实践**：最小权限、显式允许、敏感操作 ask
 

@@ -82,6 +82,20 @@ prerequisite:
 npm install @opencode-ai/sdk
 ```
 
+### V1 与 V2 入口
+
+本课现有示例使用 V1 入口 `@opencode-ai/sdk`。到 `v1.18.22`，V1 **没有移除**；同一个包另外导出 `@opencode-ai/sdk/v2`，用于会话、问题、当前位置、事件流、历史分页、运行时操作和权限请求等 V2 扩展。两套入口参数结构不同，不要只改 import 后继续照搬 V1 的 `{ path, body }` 调用。
+
+```typescript
+// V1：本课后续示例使用这个入口
+import { createOpencodeClient } from "@opencode-ai/sdk"
+
+// V2：平铺参数，详见 5.10c
+import { createOpencodeClient as createV2Client } from "@opencode-ai/sdk/v2"
+```
+
+> 来源：[`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20)、[`V1 sdk.gen.ts:431-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L431-L700)、[`V2 location:5038-5058`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5038-L5058)、[`V2 session:5171-5793`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5171-L5793)
+
 ---
 
 ## 三种使用方式

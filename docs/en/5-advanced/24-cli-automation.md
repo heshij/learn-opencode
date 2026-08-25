@@ -1,5 +1,5 @@
 ---
-title: "CLI Automation: Running OpenCode in Scripts | OpenCode Tutorial"
+title: "CLI Automation: Run OpenCode in Scripts | Tutorial"
 subtitle: "CLI Automation"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
@@ -7,12 +7,12 @@ lesson: "5.24"
 duration: "25 minutes"
 practice: "30 minutes"
 level: "Advanced"
-description: "Learn to automate OpenCode via command line, including non-interactive mode, remote servers, and CI/CD integration for fully automated workflows."
+description: "Learn CLI automation with OpenCode. This tutorial covers non-interactive runs, remote servers, CI/CD integration, and fully automated developer workflows."
 tags:
-  - CLI
-  - Automation
-  - CI/CD
-  - Remote Access
+  - "CLI"
+  - "Automation"
+  - "CI/CD"
+  - "Remote Access"
 prerequisite:
   - "5.1a Configuration Basics"
   - "2.2 Managing Conversations"
@@ -59,7 +59,7 @@ Key takeaways from this lesson:
 
 ## 🎒 Prerequisites
 
-- [ ] Completed [5.1a Configuration Basics](./01a-config-basics)
+- [ ] Completed [5.1a Configuration Basics](/en/5-advanced/01a-config-basics)
 - [ ] Can run `opencode` in terminal to start TUI
 - [ ] Understand basic Shell commands (`cd`, `echo`, pipes)
 
@@ -67,7 +67,7 @@ Key takeaways from this lesson:
 
 ## Core Concept
 
-OpenCode provides two usage modes:
+OpenCode provides four ways to work from a terminal:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -83,6 +83,13 @@ OpenCode provides two usage modes:
 │   │  • Real-time    │              │  • CI/CD        │                  │
 │   │  • Human choice │              │  • Automation   │                  │
 │   └─────────────────┘              └─────────────────┘                  │
+│                                                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │                   Minimal Interactive Mode                       │   │
+│   │                                                                   │   │
+│   │  opencode --mini   →  Minimal UI for ongoing chat and shell use  │   │
+│   │                                                                   │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                      Server Mode                                  │   │
@@ -101,9 +108,27 @@ OpenCode provides two usage modes:
 | Mode | Command | Characteristics |
 |------|---------|-----------------|
 | TUI | `opencode` | Interactive, for manual operations |
+| Mini | `opencode --mini` | Minimal interactive UI with continuous input and session replay |
 | Run | `opencode run` | Non-interactive, exits after completion |
 | Serve | `opencode serve` | Headless server, API only |
 | Web | `opencode web` | Server with Web interface |
+
+### Minimal Interactive Mode: opencode --mini
+
+`opencode --mini` is the public entry point for the minimal interactive interface. Do not write `opencode run --mini`; by default, `opencode run` remains a non-interactive command that exits after completing one task.
+
+```bash
+# Start the minimal interactive interface
+opencode --mini
+
+# Continue the most recent session; history is replayed by default and replayed again after terminal resizing
+opencode --mini --continue
+
+# Continue a session without replaying its history
+opencode --mini --continue --no-replay
+```
+
+Enter `!` at the beginning of the Mini input to switch to **Shell mode**. Continue typing the command and submit it to run. Press <kbd>Esc</kbd> to exit immediately, or press <kbd>Backspace</kbd> while the cursor is at the start of the input.
 
 ---
 
@@ -111,7 +136,7 @@ OpenCode provides two usage modes:
 
 ### 1.1 Basic Usage
 
-`opencode run` is the most commonly used CLI command. It executes a task and automatically exits.
+`opencode run` is the most commonly used CLI command. Even when invoked directly from a terminal, it does not enter an interactive interface by default; it runs the task and exits automatically.
 
 ```bash
 # Simplest usage
@@ -621,16 +646,18 @@ You learned:
 <details>
 <summary><strong>Click to expand source code locations</strong></summary>
 
-> Last updated: 2026-02-14
+> Version baseline: [`v1.18.22`](https://github.com/anomalyco/opencode/tree/v1.18.22)
 
 | Feature | File Path | Lines |
 |---------|-----------|-------|
-| `opencode run` command implementation | [`src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/run.ts#L215-L614) | 215-614 |
-| `opencode serve` command implementation | [`src/cli/cmd/serve.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/serve.ts#L6-L20) | 6-20 |
-| `opencode web` command implementation | [`src/cli/cmd/web.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/web.ts) | Full file |
-| `opencode pr` command implementation | [`src/cli/cmd/pr.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/pr.ts#L6-L112) | 6-112 |
-| Server security check | [`src/flag/flag.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/flag/flag.ts#L31-L32) | 31-32 |
-| Server authentication logic | [`src/server/server.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/server/server.ts#L84-L87) | 84-87 |
+| `run` defaults to non-interactive mode; Mini entry point | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L3-L15) | 3-15 |
+| `--mini`, `--no-replay`, and entry-point forwarding | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L123-L175) | 123-175 |
+| Mini Shell mode | [`packages/opencode/src/cli/cmd/run/footer.prompt.tsx`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run/footer.prompt.tsx#L1055-L1094) | 1055-1094 |
+| `opencode serve` implementation | [`packages/opencode/src/cli/cmd/serve.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/serve.ts#L6-L24) | 6-24 |
+| `opencode web` implementation | [`packages/opencode/src/cli/cmd/web.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/web.ts#L31-L84) | 31-84 |
+| `opencode pr` implementation | [`packages/opencode/src/cli/cmd/pr.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/pr.ts#L8-L115) | 8-115 |
+| Server authentication environment variables | [`packages/core/src/flag/flag.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/flag/flag.ts#L32-L33) | 32-33 |
+| Server authentication logic | [`packages/opencode/src/server/auth.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/auth.ts#L17-L47) | 17-47 |
 
 **Key Environment Variables**:
 - `OPENCODE_SERVER_PASSWORD`: Server password

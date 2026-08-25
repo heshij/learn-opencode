@@ -1,6 +1,6 @@
 ---
-title: "Experimental Features Overview"
-description: "Complete list of OpenCode experimental features, how to enable them, and use cases"
+title: "OpenCode Experimental Features: Complete Reference"
+description: "Learn how to enable OpenCode experimental features. This guide covers LSP tools, MCP Code Mode, background subagents, workspaces, formatting, and limits."
 ---
 
 # Experimental Features Overview
@@ -43,6 +43,8 @@ source ~/.zshrc
 # Enable only the features you need
 export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
 export OPENCODE_EXPERIMENTAL_PLAN_MODE=true
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
 ```
 
 ---
@@ -94,7 +96,7 @@ export OPENCODE_EXPERIMENTAL_LSP_TY=true
 
 | Variable | Description | Related Tutorial |
 |----------|-------------|------------------|
-| `OPENCODE_EXPERIMENTAL_PLAN_MODE` | Enable plan mode (separate plan/build) | [3.1 Plan & Build](/en/3-workflow/01-plan-build) |
+| `OPENCODE_EXPERIMENTAL_PLAN_MODE` | Expose the experimental `plan_exit` tool in the CLI | [3.1 Plan & Build](/en/3-workflow/01-plan-build) |
 
 **How to Enable**:
 ```bash
@@ -106,9 +108,82 @@ export OPENCODE_EXPERIMENTAL_PLAN_MODE=true
 - Uncertain about best approach: Plan multiple options first, then choose before starting
 - Need manual review: Plan files can be saved, shared, and iterated
 
+> The Build and Plan Agents exist whether or not this variable is set, and you can still switch Agents manually. This variable controls only whether the CLI tool list includes `plan_exit`.
+
 **New Tools**:
-- `plan_enter`: Switch to plan mode
 - `plan_exit`: Plan complete, ask whether to switch to build mode
+
+The target version does not implement a `plan_enter` tool. Enter the Plan Agent with <kbd>Tab</kbd> or your configured Agent-switching key.
+
+---
+
+### MCP Code Mode
+
+| Variable | Description | Related Tutorial |
+| --- | --- | --- |
+| `OPENCODE_EXPERIMENTAL_CODE_MODE` | Enable the restricted MCP orchestration `execute` tool | [5.7b Advanced MCP](/en/5-advanced/07b-mcp-advanced) |
+
+**How to Enable**:
+```bash
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+```
+
+`execute` appears only when the switch is enabled and at least one MCP tool is visible under the current Agent and session permissions. It runs code in a restricted interpreter and can access only the directory of visible MCP tools. It is not a shell, and every MCP invocation still performs the original tool's permission check.
+
+Source: [runtime switch](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L48), [`execute` visibility conditions](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L280-L308), and [restricted execution environment](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L239-L274).
+
+---
+
+### Background Subagents
+
+| Variable | Description |
+| --- | --- |
+| `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` | Allow `task` to use `background: true` and move a running synchronous subagent into the background |
+
+**How to Enable**:
+```bash
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+```
+
+This switch controls only background execution. Whether a subagent can launch another subagent is controlled by the root-level `subagent_depth` setting. Its default is `1`: a primary Agent can launch one level of subagents, but those subagents cannot launch nested subagents.
+
+```jsonc
+{
+  "subagent_depth": 2
+}
+```
+
+Before increasing the depth, confirm the permission boundaries and task cost. Once the limit is reached, `task` returns an error instead of silently degrading.
+
+Source: [background experimental switch](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L43), [background check and depth limit](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L96-L115), and the [`subagent_depth` schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L84-L86).
+
+---
+
+### 🗂️ Workspace Management
+
+| Variable | Description |
+| --- | --- |
+| `OPENCODE_EXPERIMENTAL_WORKSPACES` | Enable workspace support in the TUI |
+
+**How to Enable**:
+```bash
+export OPENCODE_EXPERIMENTAL_WORKSPACES=1
+```
+
+**Use Cases**:
+- Work on multiple projects or repositories at the same time
+- Use Git Worktree to switch between branches
+- Isolate context for different tasks
+
+**TUI Operations**:
+- Enter `/workspaces` to open the workspace list
+- Or press `Ctrl+P` to open the command palette, then enter "workspace"
+- Create, switch, and delete workspaces
+
+**Currently Supported Workspace Types**:
+| Type | Description |
+| --- | --- |
+| `worktree` | Git Worktree: different branches of the same repository |
 
 ---
 
@@ -226,7 +301,14 @@ export OPENCODE_EXPERIMENTAL_ICON_DISCOVERY=true   # Auto-discover project icons
 # ───────────────────────────────────────────────────────────────
 # Workflow Enhancements
 # ───────────────────────────────────────────────────────────────
-export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # Enable plan mode
+export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # Expose the CLI plan_exit tool
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true  # Enable the restricted MCP orchestration tool
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true  # Enable background subagents
+
+# ───────────────────────────────────────────────────────────────
+# Workspace Management
+# ───────────────────────────────────────────────────────────────
+export OPENCODE_EXPERIMENTAL_WORKSPACES=1    # Enable TUI workspace support
 
 # ───────────────────────────────────────────────────────────────
 # Performance & Formatting
@@ -267,9 +349,10 @@ Experimental features may have issues:
 
 ### How to disable a feature?
 
-Simply remove or comment out the corresponding environment variable:
+If the master `OPENCODE_EXPERIMENTAL` switch is not enabled, remove or comment out the dedicated variable. If the master switch is `true`, an unset dedicated variable falls back to it. In that case, explicitly set the dedicated variable to `false`, or disable the master switch:
 ```bash
-# export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # Commented out = disabled
+export OPENCODE_EXPERIMENTAL_PLAN_MODE=false
+# Or remove/disable OPENCODE_EXPERIMENTAL=true
 ```
 
 ---

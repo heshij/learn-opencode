@@ -1,13 +1,13 @@
 ---
 title: 5.12b 插件进阶
-subtitle: 所有钩子类型与高级功能
+subtitle: 常用钩子与高级功能
 course: OpenCode 中文实战课
 stage: 第五阶段
 lesson: "5.12b"
 duration: 30 分钟
 practice: 40 分钟
 level: 进阶
-description: 掌握所有事件钩子和功能钩子，创建自定义工具和认证插件，实现高级插件功能。
+description: 学习常用事件钩子和功能钩子，创建自定义工具和认证插件，实现高级插件功能。
 tags:
   - 插件
   - 钩子
@@ -18,7 +18,7 @@ prerequisite:
 
 # 插件进阶
 
-> 💡 **一句话总结**：掌握所有钩子类型，实现高级插件功能。
+> 💡 **一句话总结**：学会常用钩子类型，实现高级插件功能。
 
 ## 📝 课程笔记
 
@@ -33,7 +33,7 @@ prerequisite:
 ## 学完你能做什么
 
 - 理解事件钩子与功能钩子的区别
-- 使用所有可用的钩子类型
+- 使用常用钩子类型，并通过类型定义查找完整列表
 - 创建自定义工具
 - 实现认证插件
 
@@ -52,7 +52,7 @@ OpenCode 插件有两类钩子：
 
 <AdInArticle />
 
-使用 `event` 统一订阅所有事件：
+使用 `event` 统一订阅插件可以收到的事件：
 
 ```ts
 export const MyPlugin: Plugin = async () => {
@@ -83,7 +83,7 @@ export const MyPlugin: Plugin = async () => {
 
 ## 事件类型
 
-所有事件通过 `event` 钩子订阅，按 `event.type` 区分：
+事件通过 `event` 钩子订阅，按 `event.type` 区分。下面列的是常用事件，不是完整清单；目标版本还包含更新可用、服务器释放、VCS 和 PTY 等事件，请以 SDK 的事件联合类型为准。
 
 ### 命令事件
 
@@ -229,8 +229,8 @@ export const MyPlugin: Plugin = async () => {
       // 强制使用低温度
       output.temperature = 0.3
       
-      // 添加自定义选项（会作为 HTTP 头传递）
-      output.options.customHeader = "my-value"
+      // 添加 Provider 参数，不会自动变成 HTTP Header
+      output.options.seed = 1
     },
   }
 }
@@ -253,7 +253,17 @@ export const MyPlugin: Plugin = async () => {
 | `temperature` | `number?` | 温度参数 |
 | `topP` | `number?` | Top-P 参数 |
 | `topK` | `number?` | Top-K 参数 |
-| `options` | `Record<string, unknown>` | 自定义选项（作为 HTTP 头传递） |
+| `options` | `Record<string, unknown>` | 传给 Provider 的自定义参数，不等同于 HTTP Header |
+
+需要修改请求头时使用独立的 `chat.headers` 钩子：
+
+```ts
+export const TraceHeadersPlugin: Plugin = async () => ({
+  "chat.headers": async (input, output) => {
+    output.headers["X-Session-ID"] = input.sessionID
+  },
+})
+```
 
 ### permission.ask
 
@@ -266,8 +276,8 @@ export const MyPlugin: Plugin = async () => {
       // input: Permission 对象
       // output: { status: "ask" | "deny" | "allow" }
       
-      // 自动允许特定工具
-      if (input.tool === "read" && input.path?.startsWith("/safe/")) {
+      // 自动允许特定读取模式
+      if (input.type === "read" && input.pattern?.startsWith("/safe/")) {
         output.status = "allow"
       }
     },
@@ -488,7 +498,7 @@ export const CustomToolsPlugin: Plugin = async () => {
 |------|------|------|
 | `description` | `string` | 工具功能描述，AI 根据此决定何时使用 |
 | `args` | `Record<string, ZodType>` | 使用 Zod schema 定义参数 |
-| `execute` | `(args, ctx) => Promise<string>` | 工具执行函数 |
+| `execute` | `(args, ctx) => Promise<ToolResult>` | 工具执行函数；可返回字符串或结构化结果 |
 
 ### ToolContext
 
@@ -500,6 +510,10 @@ export const CustomToolsPlugin: Plugin = async () => {
 | `messageID` | `string` | 当前消息 ID |
 | `agent` | `string` | 调用工具的 Agent 名称 |
 | `abort` | `AbortSignal` | 中止信号，用于取消长时间操作 |
+| `directory` | `string` | 当前工作目录 |
+| `worktree` | `string` | 当前 worktree 路径 |
+| `metadata()` | `function` | 更新工具调用的标题和元数据 |
+| `ask()` | `function` | 发起权限请求 |
 
 ### 使用 abort 信号
 
@@ -538,7 +552,7 @@ tool.schema.describe("...")    // 描述（链式调用）
 
 ## 认证钩子
 
-插件可以为提供商实现自定义认证：
+v1 插件可以为 Provider 声明一组认证方法。登录界面读取 `methods`，根据用户选择执行 API Key 或 OAuth 流程；`loader` 把已保存凭据转换为 Provider 配置：
 
 ```ts
 export const MyAuthPlugin: Plugin = async () => {
@@ -549,6 +563,7 @@ export const MyAuthPlugin: Plugin = async () => {
       // 可选：从已有认证加载配置
       loader: async (auth, provider) => {
         const token = await auth()
+        if (token.type === "oauth") return { apiKey: token.access }
         return { apiKey: token.key }
       },
       
@@ -556,21 +571,7 @@ export const MyAuthPlugin: Plugin = async () => {
         {
           type: "api",
           label: "API Key",
-          prompts: [
-            {
-              type: "text",
-              key: "apiKey",
-              message: "Enter your API key",
-              validate: (value) => value.length < 10 ? "Key too short" : undefined,
-            },
-          ],
-          authorize: async (inputs) => {
-            // 验证并返回结果
-            return {
-              type: "success",
-              key: inputs.apiKey,
-            }
-          },
+          // OpenCode 会显示内置的 API Key 密码输入框并保存凭据
         },
         {
           type: "oauth",
@@ -605,6 +606,8 @@ export const MyAuthPlugin: Plugin = async () => {
 | `api` | API Key 方式，用户直接输入密钥 |
 | `oauth` | OAuth 方式，跳转浏览器授权 |
 
+OAuth 的 `method` 不是认证类型，而是回调方式：`auto` 表示插件自行等待外部浏览器回调，`code` 表示用户把授权码粘贴回来。Provider 认证服务按方法索引调用 `authorize` / `callback`（源码：[`provider/auth.ts:41-53`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/provider/auth.ts#L41-L53)、[`provider/auth.ts:163-180`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/provider/auth.ts#L163-L180)）。
+
 ### prompts 配置
 
 | 类型 | 说明 |
@@ -616,7 +619,27 @@ export const MyAuthPlugin: Plugin = async () => {
 - `key`：输入值的键名
 - `message`：提示信息
 - `validate`：验证函数
-- `condition`：条件函数，决定是否显示此 prompt
+- `when`：条件规则，决定是否显示此 prompt（旧 `condition` 函数字段已弃用）
+
+这些 `prompts` 用于收集 API Key 之外的附加字段或 OAuth 参数，不替代 `api` 方法自带的 API Key 密码输入框。`api.authorize` 是可选的；不需要自定义验证或换取凭据时应省略，让 OpenCode 直接保存用户输入的 Key。
+
+源码：[`packages/plugin/src/index.ts:95-147`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/index.ts#L95-L147)。
+
+### v2 integration connector
+
+`v1.18.22` 还提供 v2 connector 接口，用于把 Provider 之外的 integration 与凭据连接起来。它支持三类方法：
+
+| 方法 | 用途 |
+|------|------|
+| `key` | 保存用户输入的 API Key |
+| `env` | 从指定环境变量解析凭据 |
+| `oauth` | 外部浏览器 OAuth，支持自动回调或授权码，并可注册刷新函数 |
+
+v2 插件通过 `context.integration.transform` 注册或修改 integration 及其方法，通过 `context.integration.connection.active/resolve` 取得当前连接。Effect 接口见 [`packages/plugin/src/v2/effect/integration.ts:15-62`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/effect/integration.ts#L15-L62)，Promise 接口见 [`packages/plugin/src/v2/promise/integration.ts:1-14`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/promise/integration.ts#L1-L14)。
+
+::: warning 不要混用两代接口
+上面的 `auth: { provider, methods, loader }` 示例属于 v1 `Plugin`。v2 connector 使用 `context.integration`，凭据由 integration connection 层保存、解析和刷新；不要把两者的字段拼在同一个对象里。
+:::
 
 ---
 
@@ -631,11 +654,14 @@ export const TimeTrackingPlugin: Plugin = async ({ client }) => {
   return {
     event: async ({ event }) => {
       if (event.type === "session.created") {
-        sessionTimes.set(event.properties.id, Date.now())
+        const sessionID = event.properties.info.id
+        sessionTimes.set(sessionID, Date.now())
         await client.app.log({
-          service: "time-tracking",
-          level: "info",
-          message: `Session started: ${event.properties.id}`,
+          body: {
+            service: "time-tracking",
+            level: "info",
+            message: `Session started: ${sessionID}`,
+          },
         })
       }
       
@@ -644,18 +670,20 @@ export const TimeTrackingPlugin: Plugin = async ({ client }) => {
         if (startTime) {
           const duration = Date.now() - startTime
           await client.app.log({
-            service: "time-tracking",
-            level: "info",
-            message: `Session duration: ${Math.round(duration / 1000)}s`,
-            extra: { sessionID: event.properties.sessionID, duration },
+            body: {
+              service: "time-tracking",
+              level: "info",
+              message: `Session duration: ${Math.round(duration / 1000)}s`,
+              extra: { sessionID: event.properties.sessionID, duration },
+            },
           })
         }
       }
     },
     
-    "chat.params": async (input, output) => {
+    "chat.headers": async (input, output) => {
       // 为所有请求添加追踪头
-      output.options["X-Session-ID"] = input.sessionID
+      output.headers["X-Session-ID"] = input.sessionID
     },
   }
 }
@@ -680,7 +708,7 @@ export const TimeTrackingPlugin: Plugin = async ({ client }) => {
 你学会了：
 
 1. 事件钩子与功能钩子的区别
-2. 所有可用的钩子类型及其用途
+2. 常用钩子类型及其用途，以及查阅完整类型定义的方法
 3. 创建自定义工具（含 abort 信号处理）
 4. 实现认证插件
 

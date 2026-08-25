@@ -130,7 +130,7 @@ Plan Agent 使用**权限隔离**机制保护你的代码——它被禁止编�
 ## 可用工具
 <AdInArticle />
 
-Plan Agent 可以使用只读工具，Build Agent 可以使用所有工具：
+Plan Agent 可以读取、搜索和执行 Shell 命令，但默认不能编辑源代码；Build Agent 可以使用所有工具：
 
 ### 只读工具（Plan 和 Build 都可用）
 
@@ -142,13 +142,18 @@ Plan Agent 可以使用只读工具，Build Agent 可以使用所有工具：
 | `list` | 列出目录内容 |
 | `webfetch` | 获取网页内容 |
 
-### 读写工具（仅 Build 默认可用）
+### 写入工具（仅 Build 默认可用）
 
 | 工具 | 说明 |
 |------|------|
 | `write` | 创建新文件 |
 | `edit` | 修改现有文件 |
-| `bash` | 执行 Shell 命令 |
+
+### 执行工具（Plan 和 Build 都可用）
+
+| 工具 | 说明 |
+|------|------|
+| `bash` | 执行 Shell 命令；是否允许具体命令仍受权限规则控制 |
 
 ---
 
@@ -190,7 +195,7 @@ Plan Agent 可以使用只读工具，Build Agent 可以使用所有工具：
 **配置项说明**：
 
 - `model`：使用的模型，格式为 `provider/model-id`
-- `temperature`：控制随机性（0-1），值越低越专注
+- `temperature`：控制随机性的有限数字；实际可用范围由模型与 Provider 决定，常见模型通常是值越低越专注
 - `permission.edit`：文件编辑权限
   - `"allow"`：允许编辑
   - `"deny"`：禁止编辑
@@ -259,6 +264,8 @@ Plan Agent 可以使用只读工具，Build Agent 可以使用所有工具：
 /undo
 ```
 
+`/undo` 会回到上一条用户消息，并回滚该消息之后关联的文件补丁；如果撤销过头，可用 `/redo` 恢复会话和文件。文件恢复依赖快照：`snapshot: false` 只关闭文件的撤销/重做，不会关闭会话消息的 undo/redo。
+
 ---
 
 ## 技巧：让 AI 跟踪任务进度
@@ -301,7 +308,7 @@ AI: 让我查看一下...
 - 你中途可能离开，回来想知道进度
 - 你想让 AI 有条理地执行，不遗漏步骤
 
-> 💡 **原理**：AI 内部有 `todoread` 和 `todowrite` 工具。你不用管工具细节，只需要在提示词里说"用 TODO 跟踪"即可。
+> 💡 **原理**：AI 使用 `todowrite` 工具维护和读取当前待办列表。你不用管工具细节，只需要在提示词里说“用 TODO 跟踪”即可。
 
 ---
 
@@ -310,7 +317,7 @@ AI: 让我查看一下...
 > 全部通过才能继续
 
 - [ ] <kbd>Tab</kbd> 能在 Plan Agent 和 Build Agent 之间切换
-- [ ] Plan Agent 禁止编辑源代码，只能编辑 `.opencode/plans/*.md` 计划文件
+- [ ] Plan Agent 禁止编辑源代码，默认只能编辑项目或全局计划文件
 - [ ] Build Agent 可以自由修改文件和执行命令
 - [ ] 知道怎么让 AI 用 TODO 跟踪任务进度
 
@@ -322,7 +329,7 @@ AI: 让我查看一下...
 |-----|-----|-----|
 | 想让 AI 改文件但没改 | 可能在 Plan Agent，它被禁止编辑源代码 | 按 Tab 切换到 Build |
 | AI 改了不该改的文件 | 在 Build Agent，权限是 `allow` | 用 `/undo` 撤销，下次用 Plan 先分析 |
-| Plan Agent 无法编辑源代码 | 这是设计如此，Plan 只能编辑计划文件 | 切换到 Build 执行修改 |
+| Plan Agent 无法编辑源代码 | 这是设计如此，Plan 默认只能编辑项目或全局计划文件 | 切换到 Build 执行修改 |
 
 ---
 
@@ -332,15 +339,15 @@ AI: 让我查看一下...
 
 Plan Agent 通常使用较低的 `temperature`（如 0.1），输出更专注和确定；Build Agent 使用中等值（如 0.3），在专注和创造力之间平衡。
 
-### maxSteps：限制迭代次数
+### steps：限制自动迭代次数
 
-可以设置 Agent 最多执行多少次工具调用，避免过度操作或产生过多费用。
+可以用正整数设置 Agent 的最大自动迭代步数。达到上限后，Agent 会改为输出最终纯文本响应。一次迭代可能包含多个工具调用，所以它不是工具调用次数的硬上限。
 
 ```jsonc
 {
   "agent": {
     "plan": {
-      "steps": 5  // 最多 5 次工具调用
+      "steps": 5  // 最多 5 次自动迭代
     }
   }
 }
@@ -348,10 +355,11 @@ Plan Agent 通常使用较低的 `temperature`（如 0.1），输出更专注和
 
 ### 自定义快捷键
 
-默认使用 <kbd>Tab</kbd> 切换 Agent，也可以在配置中修改 `agent_cycle` 键绑定：
+默认使用 <kbd>Tab</kbd> 切换 Agent，也可以在独立的 `tui.jsonc` 中修改 `agent_cycle` 键绑定：
 
-```jsonc
+```jsonc title="tui.jsonc"
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "agent_cycle": "tab",           // 切换到下一个 Agent（默认值）
     "agent_cycle_reverse": "shift+tab"  // 切换到上一个 Agent（默认值）
@@ -359,10 +367,12 @@ Plan Agent 通常使用较低的 `temperature`（如 0.1），输出更专注和
 }
 ```
 
-### plan_enter / plan_exit：AI 自动切换模式
+从 v1.17.0 起，`theme`、`keybinds` 和旧的 `tui` 字段不再属于主 `opencode.json`/`opencode.jsonc`。TUI 启动时会按配置目录迁移这些旧字段：如果目标 `tui.json` 已存在则跳过；写入成功后，会备份原主配置并删除其中的旧字段。独立 TUI 配置继续按全局、自定义、项目和 `.opencode` 层级加载，也可以直接使用 `tui.jsonc`。
+
+### plan_exit：让 Plan Agent 请求开始执行
 
 ::: warning ⚠️ 实验性功能
-这两个工具目前是**实验性功能**，需要同时满足以下条件才能使用：
+`plan_exit` 目前是**实验性功能**，需要同时满足以下条件才能使用：
 
 1. 启用实验模式：设置 `OPENCODE_EXPERIMENTAL=true` 或 `OPENCODE_EXPERIMENTAL_PLAN_MODE=true`
 2. 使用 CLI 客户端：在终端中运行 OpenCode（非 Web/IDE 集成）
@@ -370,21 +380,16 @@ Plan Agent 通常使用较低的 `temperature`（如 0.1），输出更专注和
 未来版本可能会正式开放，届时本教程会更新。
 :::
 
-除了手动按 <kbd>Tab</kbd> 切换，AI 还可以**主动调用工具**切换模式：
+进入 Plan Agent 请手动按 <kbd>Tab</kbd>（或使用你配置的 Agent 切换键）。目标版本没有 `plan_enter` 工具。Plan Agent 完成规划后，可以调用 `plan_exit` 请求回到 Build：
 
 | 工具 | 作用 | 可用 Agent |
 |------|------|-----------|
-| `plan_enter` | 进入 Plan 模式 | Build Agent 可用 |
 | `plan_exit` | 退出 Plan 模式，回到 Build | Plan Agent 可用 |
 
 **工作流程**：
 
 ```
-你: 这个模块需要重构，先帮我分析一下，不要直接改
-
-AI: [调用 plan_enter 工具]
-    → 弹出确认框：是否切换到 Plan 模式？
-    → 你选择 Yes
+你: [按 Tab 切换到 Plan Agent]
     → AI 在 Plan 模式下分析代码
     → 生成计划文件 .opencode/plans/xxx.md
 
@@ -396,7 +401,7 @@ AI: [调用 plan_exit 工具]
     → AI 在 Build 模式下执行修改
 ```
 
-**Plan 模式下 AI 只能编辑计划文件**（`.opencode/plans/*.md`），不能修改源代码。这确保了"规划"和"执行"的安全隔离。
+**Plan 模式下 AI 默认只能编辑项目或全局计划文件**，不能修改源代码。这确保了“规划”和“执行”的安全隔离。
 
 ### 计划文件存储位置
 
@@ -405,13 +410,13 @@ Plan 模式下，AI 生成的计划文件会保存到以下位置：
 | 级别 | 路径 | 说明 |
 |------|------|------|
 | 项目级 | `.opencode/plans/<created>-<slug>.md` | 保存在项目目录，跟随项目 |
-| 全局级 | `~/.local/share/opencode/plans/<created>-<slug>.md` | 保存在全局目录，跨项目共享 |
+| 全局级 | `<Global.Path.data>/plans/<created>-<slug>.md` | 保存在 OpenCode 全局数据目录，跨项目共享 |
 
-> `created` 是创建时间戳，`slug` 是计划标题的 URL 友好格式。例如：`1736854321-refactor-auth.md`
+> `created` 是 13 位毫秒时间戳，`slug` 是计划标题的 URL 友好格式。例如：`1736854321000-refactor-auth.md`。Linux 常见默认数据目录是 `~/.local/share/opencode`，但实际路径会受平台和 XDG 环境变量影响，可用 `opencode debug paths` 查看 `data`。
 
 ::: tip 存储位置判断规则
 - **项目有 Git（或其他版本控制）** → 保存在项目级 `.opencode/plans/`
-- **项目无版本控制** → 保存在全局级 `~/.local/share/opencode/plans/`
+- **项目无版本控制** → 保存在 `<Global.Path.data>/plans/`
 :::
 
 查看计划文件：
@@ -420,8 +425,8 @@ Plan 模式下，AI 生成的计划文件会保存到以下位置：
 # 查看项目级计划
 cat .opencode/plans/*.md
 
-# 查看全局级计划
-cat ~/.local/share/opencode/plans/*.md
+# 查看全局数据目录；在输出的 data 路径后追加 plans/
+opencode debug paths
 ```
 
 > 💡 这些功能进阶时再深入，当前阶段了解即可。
@@ -435,7 +440,7 @@ cat ~/.local/share/opencode/plans/*.md
 1. Plan 和 Build 是两个 Primary Agents
 2. 用 <kbd>Tab</kbd> 键（或配置的 `agent_cycle`）在 Agents 之间切换
 3. Plan 用于分析规划（禁止编辑源代码），Build 用于开发执行（所有工具可用）
-4. Plan Agent 只能编辑 `.opencode/plans/*.md` 计划文件
+4. Plan Agent 默认只能编辑项目或全局计划文件，不能编辑源代码
 5. 复杂任务可以告诉 AI "用 TODO 跟踪进度"，让 AI 有条理地执行
 
 ---
@@ -454,12 +459,15 @@ cat ~/.local/share/opencode/plans/*.md
 | Build Agent 定义 | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L77-L91) | 77-91 |
 | Plan Agent 定义 | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L92-L114) | 92-114 |
 | 默认权限规则 | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L55-L73) | 55-73 |
-| plan_enter 工具 | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/plan.ts#L75-L130) | 75-130 |
-| plan_exit 工具 | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/plan.ts#L20-L73) | 20-73 |
+| plan_exit 工具 | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/plan.ts#L13-L79) | 13-79 |
 | Plan 模式提示词 | [`packages/opencode/src/session/prompt.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/prompt.ts#L1451-L1455) | 1451-1455 |
+| undo/revert 与文件补丁回滚 | [`packages/opencode/src/session/revert.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L88) | 38-88 |
+| redo/unrevert 与文件恢复 | [`packages/opencode/src/session/revert.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L91-L98) | 91-98 |
+| `snapshot: false` 的边界 | [`packages/core/src/v1/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55) | 52-55 |
+| TUI 配置自动迁移 | [`packages/opencode/src/config/tui-migrate.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67) | 24-67 |
+| TUI 配置加载层级 | [`packages/opencode/src/config/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) | 171-209 |
 
 **关键常量**：
-- `plan_enter`：从 Build 切换到 Plan 的工具
 - `plan_exit`：从 Plan 切换到 Build 的工具
 
 **权限动作**：

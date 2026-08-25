@@ -43,8 +43,7 @@ opencode debug config
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "keybinds": { ... },
-  // Lists all loaded Agents (including default and custom)
+  // Lists Agents declared in the configuration
   "agent": {
     "coder": { ... },
     "writer": { ... },
@@ -55,9 +54,16 @@ opencode debug config
 }
 ```
 
+::: warning TUI configuration is not shown here
+Interface settings such as `theme`, `keybinds`, scrolling, and cursor behavior have moved to the standalone `tui.json` / `tui.jsonc` file. `opencode debug config` reads the main configuration service, so it is normal for these fields to be absent from its output. Inspect the TUI configuration file at the relevant level and its `https://opencode.ai/tui.json` schema instead.
+:::
+
+If an old main configuration still contains `theme`, `keybinds`, or `tui`, first check whether the same directory already has a `tui.json`. Automatic migration is skipped when that file exists; a `tui.jsonc` alone does not cause the migration to be skipped. If there is no target file, starting the TUI should create `tui.json` and `<original-main-config>.tui-migration.bak`; an existing backup is reused. The old fields are removed from the main configuration only after both the new file and the backup have been written successfully.
+
+> Source references: [`debug config` reads only the main configuration service](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/debug/config.ts#L5-L13) and the [TUI migration rules](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67).
+
 ::: tip 💡 How to see which Agents are loaded?
-Look directly at the `agent` field in the `opencode debug config` output. It lists all **registered and available** Agents.
-If an Agent isn't here, the definition file has issues, or OpenCode didn't scan it.
+The `agent` field from `opencode debug config` confirms only Agents declared in configuration; it is not the complete runtime list. Built-in Agents are assembled separately by the Agent service. Use the TUI Agent list or the Agent API to inspect the currently available Agents.
 :::
 
 ### 2. Debug File System (File & Ripgrep)
@@ -179,7 +185,7 @@ opencode debug snapshot diff <hash>
 
 | Command | Purpose | Typical Use Case |
 |---------|---------|------------------|
-| `debug config` | View final configuration | Check if config is in effect, view default keybindings |
+| `debug config` | View the final main configuration | Check whether main settings such as models, Agents, and permissions are in effect |
 | `debug agent <name>` | View Agent details | Check prompts, permissions, tool list |
 | `debug agent --tool` | **Manually execute tool** | Verify tool parameter format, test tool permissions |
 | `debug skill` | List Skills | Confirm if Skill is loaded, view load path |

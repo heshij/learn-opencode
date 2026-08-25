@@ -362,14 +362,18 @@ $ARGUMENTS
 | `/init` | 创建/更新 AGENTS.md | - |
 | `/models` | 列出可用模型 | - |
 | `/new` | 新建会话 | `/clear` |
-| `/redo` | 重做 | - |
+| `/redo` | 恢复已撤销的会话内容和关联文件 | - |
 | `/sessions` | 列出/切换会话 | `/resume`, `/continue` |
 | `/share` | 分享会话 | - |
 | `/themes` | 列出主题 | - |
-| `/undo` | 撤销 | - |
+| `/undo` | 回到上一条用户消息并回滚关联文件 | - |
 | `/unshare` | 取消分享 | - |
 
 > **来源**：[官方文档 - TUI Commands](https://opencode.ai/docs/tui#commands)
+
+`/undo` 和 `/redo` 不只是隐藏或恢复消息，也会通过快照回滚或恢复关联文件。若主配置设置了 `"snapshot": false`，会话仍可撤销/重做，但文件不会随之恢复。
+
+> **源码（v1.18.22）**：[`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98)、[`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)
 
 ### 覆盖示例
 

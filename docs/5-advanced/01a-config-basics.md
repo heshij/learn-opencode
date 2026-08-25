@@ -53,15 +53,15 @@ prerequisite:
 
 ## 配置文件位置
 
-OpenCode 按以下顺序加载配置，优先级从低到高（后加载的覆盖先加载的）：
+OpenCode 按以下顺序加载主配置，优先级从低到高（后加载的覆盖先加载的）：
 
 | 优先级 | 位置 | 说明 |
 |-------|-----|------|
 | 1（最低） | 远程 `.well-known/opencode` | 远程组织默认配置（通过 Auth 机制获取） |
-| 2 | `~/.config/opencode/opencode.json` | 全局用户配置 |
+| 2 | `~/.config/opencode/opencode.json(c)` | 全局用户配置 |
 | 3 | `OPENCODE_CONFIG` 环境变量 | 自定义配置文件路径 |
-| 4 | `./opencode.json` | 项目根目录配置 |
-| 5 | `./.opencode/opencode.json` | 项目 .opencode 目录配置 |
+| 4 | `./opencode.json(c)` | 项目配置，按打开位置向上逐层发现 |
+| 5 | `./.opencode/opencode.json(c)` | 项目 `.opencode` 目录配置 |
 | 6 | `OPENCODE_CONFIG_CONTENT` 环境变量 | 内联配置内容（JSON 字符串） |
 | 7（最高） | 受管配置目录 | 企业部署，管理员控制 |
 
@@ -84,6 +84,7 @@ OpenCode 按以下顺序加载配置，优先级从低到高（后加载的覆�
 ```
 ~/.config/opencode/
 ├── opencode.json       # 全局配置
+├── tui.json            # 全局 TUI 配置
 ├── AGENTS.md           # 全局规则
 ├── agent/              # 全局 Agent
 ├── command/            # 全局命令
@@ -91,9 +92,11 @@ OpenCode 按以下顺序加载配置，优先级从低到高（后加载的覆�
 
 项目目录/
 ├── opencode.json       # 项目配置（优先级 4）
+├── tui.json            # 项目 TUI 配置
 ├── AGENTS.md           # 项目规则
 └── .opencode/
     ├── opencode.json   # 项目配置（优先级 5，推荐）
+    ├── tui.json        # 项目 TUI 配置
     ├── agent/          # 项目 Agent
     ├── command/        # 项目命令
     └── plugin/         # 项目插件
@@ -113,7 +116,7 @@ OpenCode 按以下顺序加载配置，优先级从低到高（后加载的覆�
 }
 ```
 
-> 配置文件名可以是 `opencode.json` 或 `opencode.jsonc`。
+> 主配置文件名可以是 `opencode.json` 或 `opencode.jsonc`。V2 配置发现只识别这两个名称；旧的全局 `~/.config/opencode/config.json` 仍由兼容加载器读取。没有全局配置时，当前加载器默认创建 `opencode.jsonc`。未知顶层字段会被忽略，而不是报错。
 
 ---
 
@@ -147,7 +150,7 @@ OpenCode 按以下顺序加载配置，优先级从低到高（后加载的覆�
 
 设置默认使用的 primary agent（必须是 primary 模式）。可选值：
 - `"build"` - 默认，所有工具可用
-- `"plan"` - 只读模式，编辑需确认
+- `"plan"` - 禁止编辑源代码，只允许写入项目或全局计划文件
 - 或你自定义的 primary agent 名称
 
 ---
@@ -243,13 +246,29 @@ Amazon Bedrock 支持 AWS 特定配置：
 
 ## 主题配置
 
-```json
+主题属于 TUI 配置，应写入独立的 `tui.json` 或 `tui.jsonc`，不要写入主 `opencode.json`：
+
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "tokyonight"
 }
 ```
 
-> 注意：配置键是 `theme`，不是 `tui.theme`。
+> 注意：`theme` 是 `tui.json` 的顶层键，不是 `tui.theme`。主配置加载器会忽略 `theme`、`keybinds` 和 `tui`。
+
+### 旧配置自动迁移
+
+启动 TUI 时，OpenCode 会尝试把旧 `opencode.json` / `opencode.jsonc` 中的 `theme`、`keybinds` 和 `tui` 迁移到同目录的 `tui.json`：
+
+1. 如果该目录已经有目标 `tui.json`，跳过这个目录，不修改任何文件。只有 `tui.jsonc` 不会触发跳过，迁移器仍会创建 `tui.json`。
+2. 迁移器先识别 `theme` 字符串和 `keybinds` 对象；旧 `tui` 中的滚动速度、滚动加速和 Diff 样式会在迁移阶段直接按对应 Schema 解码，无效值不会写入目标文件。生成的 `tui.json` 在加载时还会执行完整 Schema 校验。
+3. 先成功写入 `tui.json`，再为原文件创建一次性备份 `<原文件>.tui-migration.bak`；已有备份会直接复用，不会覆盖。
+4. 只有备份成功后，才从原主配置删除 `theme`、`keybinds` 和 `tui`。迁移不是事务操作：如果新 `tui.json` 已写入，但备份或原文件回写失败，新文件不会回滚，旧字段也可能仍在；下次启动会因 `tui.json` 已存在而跳过，不会自动重试。
+
+迁移检查覆盖全局主配置、从当前目录向上发现的项目主配置、配置目录中的主配置，以及 `OPENCODE_CONFIG` 指定文件。迁移后，TUI 配置按全局 `tui.json(c)` → `OPENCODE_TUI_CONFIG` 指定文件 → 普通项目 `tui.json(c)` → `.opencode/tui.json(c)` → `OPENCODE_CONFIG_DIR` 合并，后加载的值优先。同一目录先加载 `.json`，再加载 `.jsonc`。普通项目文件按根侧到当前目录应用，因此越近当前目录越优先；多个 `.opencode` 目录则按当前侧到根侧合并，因此同名字段冲突时更靠根侧的目录后加载并取胜。`OPENCODE_CONFIG_DIR` 最后加载。
+
+> 源码依据：[主配置过滤旧 TUI 字段](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L53-L61)、[迁移与备份规则](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67) 和 [独立配置加载层级](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209)。
 
 ---
 
@@ -347,11 +366,17 @@ Amazon Bedrock 支持 AWS 特定配置：
   // 用户
   "username": "开发者",
   
-  // 主题
-  "theme": "catppuccin",
-  
   // 自动更新
   "autoupdate": true
+}
+```
+
+配套的 `tui.jsonc`：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "catppuccin"
 }
 ```
 
@@ -366,6 +391,7 @@ Amazon Bedrock 支持 AWS 特定配置：
 | JSON 解析错误 | 格式错误 | 使用 JSONC 格式或检查语法 |
 | 用了 `providers` | 键名错误 | 应为 `provider`（单数） |
 | Provider 不加载 | 在 disabled 列表中 | 检查 `disabled_providers` |
+| 主题配置不生效 | 把 `theme` 写在主配置 | 移到同层级的 `tui.json` / `tui.jsonc` |
 
 ---
 
@@ -377,7 +403,7 @@ Amazon Bedrock 支持 AWS 特定配置：
 2. 模型配置（model、small_model、default_agent）
 3. Provider 配置（options、黑白名单）
 4. 变量替换（环境变量、文件内容）
-5. 用户名、主题、自动更新配置
+5. 用户名、自动更新，以及独立的 TUI 主题配置
 
 ---
 

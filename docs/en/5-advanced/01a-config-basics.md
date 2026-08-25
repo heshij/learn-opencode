@@ -1,12 +1,12 @@
 ---
-title: "5.1a Configuration Basics"
+title: "5.1a OpenCode Configuration Basics | OpenCode Tutorial"
 subtitle: "opencode.json Core Configuration"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.1a"
 duration: "15 minutes"
 level: "Advanced"
-description: "Learn opencode.json core configuration to control OpenCode's basic behavior and customize your development environment."
+description: "Learn OpenCode configuration basics: file precedence, models and providers, variable substitution, user settings, auto-updates, and separate TUI configuration."
 tags:
   - "Configuration"
   - "JSON"
@@ -56,12 +56,12 @@ Key takeaways from this lesson:
 OpenCode loads configuration in the following order, from lowest to highest priority (later ones override earlier ones):
 
 | Priority | Location | Description |
-|-------|-----|------|
+| --- | --- | --- |
 | 1 (lowest) | Remote `.well-known/opencode` | Remote organization default config (obtained via Auth mechanism) |
-| 2 | `~/.config/opencode/opencode.json` | Global user configuration |
+| 2 | `~/.config/opencode/opencode.json(c)` | Global user configuration |
 | 3 | `OPENCODE_CONFIG` environment variable | Custom config file path |
-| 4 | `./opencode.json` | Project root directory configuration |
-| 5 | `./.opencode/opencode.json` | Project .opencode directory configuration |
+| 4 | `./opencode.json(c)` | Project configuration, discovered by walking upward from the directory you opened |
+| 5 | `./.opencode/opencode.json(c)` | Configuration in the project's `.opencode` directory |
 | 6 | `OPENCODE_CONFIG_CONTENT` environment variable | Inline config content (JSON string) |
 | 7 (highest) | Managed config directory | Enterprise deployment, admin-controlled |
 
@@ -71,7 +71,7 @@ OpenCode loads configuration in the following order, from lowest to highest prio
 In enterprise environments, administrators can place configuration in system-level directories with the highest priority, overriding all user and project configurations:
 
 | Platform | Path |
-|------|------|
+| --- | --- |
 | macOS | `/Library/Application Support/opencode` |
 | Windows | `%ProgramData%\opencode` |
 | Linux | `/etc/opencode` |
@@ -84,6 +84,7 @@ Regular users generally don't need this, just be aware it exists.
 ```
 ~/.config/opencode/
 ├── opencode.json       # Global configuration
+├── tui.json            # Global TUI configuration
 ├── AGENTS.md           # Global rules
 ├── agent/              # Global Agents
 ├── command/            # Global commands
@@ -91,9 +92,11 @@ Regular users generally don't need this, just be aware it exists.
 
 Project directory/
 ├── opencode.json       # Project configuration (priority 4)
+├── tui.json            # Project TUI configuration
 ├── AGENTS.md           # Project rules
 └── .opencode/
     ├── opencode.json   # Project configuration (priority 5, recommended)
+    ├── tui.json        # Project TUI configuration
     ├── agent/          # Project Agents
     ├── command/        # Project commands
     └── plugin/         # Project plugins
@@ -113,7 +116,7 @@ Supports JSON and JSONC (JSON with comments):
 }
 ```
 
-> Configuration filename can be `opencode.json` or `opencode.jsonc`.
+> The main configuration file may be named `opencode.json` or `opencode.jsonc`. V2 configuration discovery recognizes only these two names; the compatibility loader still reads the legacy global file `~/.config/opencode/config.json`. If no global configuration exists, the current loader creates `opencode.jsonc` by default. Unknown top-level fields are ignored rather than reported as errors.
 
 ---
 
@@ -131,7 +134,7 @@ Supports JSON and JSONC (JSON with comments):
 ```
 
 | Field | Description |
-|-----|------|
+| --- | --- |
 | `model` | Main model (format: provider/model) |
 | `small_model` | Small model for simple tasks (like generating titles) |
 
@@ -147,7 +150,7 @@ Supports JSON and JSONC (JSON with comments):
 
 Sets the default primary agent to use (must be primary mode). Options:
 - `"build"` - Default, all tools available
-- `"plan"` - Read-only mode, editing requires confirmation
+- `"plan"` - Cannot edit source code; may write only project or global plan files
 - Or a custom primary agent name you've defined
 
 ---
@@ -177,7 +180,7 @@ Sets the default primary agent to use (must be primary mode). Options:
 ### Options Field Reference
 
 | Field | Type | Description |
-|-----|------|------|
+| --- | --- | --- |
 | `apiKey` | string | API key |
 | `baseURL` | string | Custom API endpoint (commonly used for proxies) |
 | `timeout` | number \| false | Request timeout (milliseconds), default 300000, set to false to disable |
@@ -202,7 +205,7 @@ Amazon Bedrock supports AWS-specific configuration:
 ```
 
 | Field | Description |
-|-----|------|
+| --- | --- |
 | `region` | AWS region (default from `AWS_REGION` env var or `us-east-1`) |
 | `profile` | AWS profile name (from `~/.aws/credentials`) |
 | `endpoint` | Custom endpoint URL (for VPC endpoints) |
@@ -219,7 +222,7 @@ Control which Providers to load:
 ```
 
 | Field | Description |
-|-----|------|
+| --- | --- |
 | `disabled_providers` | List of disabled Providers, won't load even with API Key |
 | `enabled_providers` | Only enable these Providers, ignore all others |
 
@@ -243,13 +246,29 @@ Displays a custom username in conversations instead of the system username.
 
 ## Theme Configuration
 
-```json
+Themes belong in the TUI configuration. Put them in a separate `tui.json` or `tui.jsonc`, not in the main `opencode.json`:
+
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "tokyonight"
 }
 ```
 
-> Note: Configuration key is `theme`, not `tui.theme`.
+> Note: `theme` is a top-level key in `tui.json`, not `tui.theme`. The main configuration loader ignores `theme`, `keybinds`, and `tui`.
+
+### Automatic Migration of Legacy Configuration
+
+When the TUI starts, OpenCode attempts to migrate `theme`, `keybinds`, and `tui` from a legacy `opencode.json` / `opencode.jsonc` into `tui.json` in the same directory:
+
+1. If that directory already contains a destination `tui.json`, OpenCode skips the directory without modifying any files. A `tui.jsonc` alone does not trigger this skip; the migrator still creates `tui.json`.
+2. The migrator first recognizes a string-valued `theme` and an object-valued `keybinds`. Legacy scroll speed, scroll acceleration, and diff-style values under `tui` are decoded against their corresponding schemas during migration, so invalid values are not written to the destination. The generated `tui.json` is also fully schema-validated when loaded.
+3. It first writes `tui.json` successfully, then creates a one-time backup of the original file named `<original-file>.tui-migration.bak`. If the backup already exists, it is reused rather than overwritten.
+4. Only after the backup succeeds does it remove `theme`, `keybinds`, and `tui` from the original main configuration. Migration is not transactional: if the new `tui.json` has been written but creating the backup or rewriting the original fails, the new file is not rolled back and the legacy fields may remain. The next launch sees the existing `tui.json`, skips that directory, and does not retry automatically.
+
+Migration checks the global main configuration, project main configurations discovered by walking upward from the current directory, main configurations in configuration directories, and the file specified by `OPENCODE_CONFIG`. After migration, TUI configuration is merged in this order: global `tui.json(c)` → the file specified by `OPENCODE_TUI_CONFIG` → ordinary project `tui.json(c)` files → `.opencode/tui.json(c)` files → `OPENCODE_CONFIG_DIR`. Later values take precedence. Within the same directory, `tui.json` is loaded before `tui.jsonc`. Ordinary project files are applied from the root side toward the current directory, so the nearest file wins. Multiple `.opencode` directories are merged in the opposite direction—from the current side toward the root—so a conflicting value in the rootmost one is loaded later and wins. `OPENCODE_CONFIG_DIR` is loaded last.
+
+> Source references: [filtering legacy TUI fields from the main configuration](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L53-L61), [migration and backup rules](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67), and the [separate configuration loading hierarchy](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209).
 
 ---
 
@@ -262,7 +281,7 @@ Displays a custom username in conversations instead of the system username.
 ```
 
 | Value | Description |
-|-----|------|
+| --- | --- |
 | `true` | Automatically download updates on startup (default) |
 | `false` | Disable auto-update |
 | `"notify"` | Only notify of new versions, don't auto-update |
@@ -347,11 +366,17 @@ Variable substitution is useful for:
   // User
   "username": "Developer",
   
-  // Theme
-  "theme": "catppuccin",
-  
   // Auto-update
   "autoupdate": true
+}
+```
+
+The accompanying `tui.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "catppuccin"
 }
 ```
 
@@ -360,12 +385,13 @@ Variable substitution is useful for:
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-----|-----|-----|
+| --- | --- | --- |
 | Configuration not taking effect | Priority issue | Project-level config takes precedence over global |
 | Variable substitution fails | Environment variable doesn't exist | Confirm the env var is set |
 | JSON parsing error | Format error | Use JSONC format or check syntax |
 | Used `providers` | Wrong key name | Should be `provider` (singular) |
 | Provider not loading | In disabled list | Check `disabled_providers` |
+| Theme configuration has no effect | `theme` was placed in the main configuration | Move it to `tui.json` / `tui.jsonc` at the same level |
 
 ---
 
@@ -377,7 +403,7 @@ You learned:
 2. Model configuration (model, small_model, default_agent)
 3. Provider configuration (options, allowlist/blocklist)
 4. Variable substitution (environment variables, file contents)
-5. Username, theme, and auto-update configuration
+5. Username, auto-update, and separate TUI theme configuration
 
 ---
 

@@ -252,7 +252,7 @@ git worktree remove --force ../my-project-hotfix
 ### 第 6 步：在 OpenCode 中使用工作区
 
 **为什么**  
-配合 OpenCode 的实验性工作区功能，在 TUI 中快速切换。
+配合 OpenCode 的实验性工作区功能，在 TUI 中快速切换。`v1.18.22` 的 workspace 已采用 adapter 架构，内置 adapter 是 `worktree`；`/workspaces` 管理的是 adapter 创建或发现的 workspace，不是另一套独立的 clone 机制。
 
 首先启用实验性功能：
 
@@ -264,7 +264,7 @@ export OPENCODE_EXPERIMENTAL_WORKSPACES=1
 source ~/.zshrc
 ```
 
-重启 `opencode tui`，输入：
+重启 `opencode`，输入：
 
 ```
 /workspaces
@@ -277,6 +277,12 @@ source ~/.zshrc
 | 选择工作区 | 切换到对应的 worktree 目录 |
 | + New workspace | 创建新的 worktree |
 | 按 Delete 键 | 删除选中的 worktree |
+
+::: warning 当前实现与历史 Release 的边界
+v1.16.0 Release 曾加入 managed workspace cloning，并宣传保留脏文件和未跟踪文件。到 `v1.18.22`，当前创建与发现路径已经是 workspace adapter + 内置 worktree adapter；会话移动时可选择通过 `copyChanges` 复制 Git 补丁，但这不等于继续提供历史 managed clone 的全部行为，尤其不要据此承诺复制未跟踪文件。
+:::
+
+> 当前实现：[`adapters/index.ts:5-18`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/adapters/index.ts#L5-L18)、[`adapters/worktree.ts:28-95`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/adapters/worktree.ts#L28-L95)、[`workspace.ts:559-620`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L559-L620)、[`workspace.ts:728-739`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L728-L739)。历史证据：[`v1.16.0 Release`](https://github.com/anomalyco/opencode/releases/tag/v1.16.0)、commit `5661af203487b90cf9ee0844b198b03cce26c412`。
 
 ---
 
@@ -501,14 +507,17 @@ git stash list
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-03-22
+> 目标版本：v1.18.22（2026-08-24）
 
 | 功能 | 文件路径 | 行号 |
 |-----|---------|------|
-| Worktree 适配器 | [`src/control-plane/adaptors/worktree.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/control-plane/adaptors/worktree.ts) | 1-46 |
-| 工作区路由中间件 | [`src/control-plane/workspace-router-middleware.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/control-plane/workspace-router-middleware.ts) | 38-49 |
-| 实验性开关 | [`src/flag/flag.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/flag/flag.ts#L68) | 68 |
-| TUI 工作区对话框 | [`src/cli/cmd/tui/component/dialog-workspace-list.tsx`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/tui/component/dialog-workspace-list.tsx) | 146-326 |
+| Adapter 注册（内置 worktree） | [`src/control-plane/adapters/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/adapters/index.ts#L5-L18) | 5-18 |
+| Worktree adapter | [`src/control-plane/adapters/worktree.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/adapters/worktree.ts#L28-L95) | 28-95 |
+| Workspace 创建 | [`src/control-plane/workspace.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L492-L538) | 492-538 |
+| Adapter 发现与登记 | [`src/control-plane/workspace.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L728-L739) | 728-739 |
+| Workspace-aware 路由 | [`workspace-routing.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts#L148-L185) | 148-185 |
+| 实验性开关 | [`src/effect/runtime-flags.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L43-L50) | 43-50 |
+| TUI `/workspaces` 命令 | [`packages/tui/src/app.tsx`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/app.tsx#L610-L618) | 610-618 |
 
 **关键环境变量**：
 - `OPENCODE_EXPERIMENTAL_WORKSPACES=1`：启用 TUI 工作区支持

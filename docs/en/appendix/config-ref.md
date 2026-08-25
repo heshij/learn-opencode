@@ -1,11 +1,11 @@
 ---
-title: "opencode.json Configuration Reference"
-description: "Complete reference manual for opencode.json configuration file, covering all available fields"
+title: "OpenCode Configuration: Complete Reference | Tutorial"
+description: "Learn OpenCode configuration. This reference covers opencode.json, tui.json settings, loading priority, migration, providers, Agents, and permissions."
 ---
 
-# opencode.json Configuration Reference
+# OpenCode Configuration Reference
 
-> This document is the complete reference manual for the OpenCode configuration file, explaining every field available in `opencode.json`.
+> This document covers the `opencode.json` main configuration and the standalone `tui.json` interface configuration. Both also support the `.jsonc` extension.
 
 ## 📝 Course Notes
 
@@ -50,7 +50,6 @@ Fields contained in the root object of the configuration file.
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
 | `username` | string | Username displayed in conversations. If not set, uses system username. | System user |
-| `theme` | string | Interface theme name. See [Theme List](../5-advanced/06a-themes). | - |
 | `autoupdate` | boolean \| "notify" | Auto-update behavior. `true`=auto update, `false`=disabled, `"notify"`=notify only. | - |
 | `logLevel` | enum | Log level. Options: `"DEBUG"`, `"INFO"`, `"WARN"`, `"ERROR"`. | - |
 | `snapshot` | boolean | Whether to enable Git snapshot backup mechanism. Set to `false` to disable. | Enabled when not set |
@@ -73,14 +72,23 @@ Fields contained in the root object of the configuration file.
 
 ---
 
-## Interface Configuration (tui)
+## TUI Interface Configuration (tui.json)
 
-Controls Terminal User Interface (TUI) display behavior.
+Terminal interface settings use a standalone `tui.json` or `tui.jsonc`. `theme`, `keybinds`, and the other interface fields belong directly in the root object. Do not put them in the main `opencode.json`, and do not wrap them in another `tui` object.
 
-```json
-"tui": {
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "tokyonight",
+  "keybinds": {
+    "session_new": "<leader>n"
+  },
   "scroll_speed": 3,
-  "diff_style": "auto"
+  "diff_style": "auto",
+  "cursor": {
+    "style": "block",
+    "blinking": true
+  }
 }
 ```
 
@@ -90,6 +98,33 @@ Controls Terminal User Interface (TUI) display behavior.
 | `scroll_acceleration` | object | Scroll acceleration configuration. | - |
 | `scroll_acceleration.enabled` | boolean | Whether to enable macOS-style inertial scrolling acceleration. | `false` |
 | `diff_style` | enum | Diff display style. `"auto"`(adaptive), `"stacked"`(always single column). | `"auto"` |
+| `theme` | string | Interface theme name. See the [theme list](/en/5-advanced/06a-themes). | - |
+| `keybinds` | object | Keyboard-shortcut overrides, merged with the built-in defaults. | `{}` |
+| `cursor.style` | enum | `"block"`, `"underline"`, `"line"`, or `"default"`. | `"block"` when `cursor` is configured |
+| `cursor.blinking` | boolean | Whether the cursor blinks; ignored when `style` is `default`. | `true` when `cursor` is configured |
+
+### TUI Configuration Loading Priority
+
+From lowest to highest priority:
+
+1. Global `~/.config/opencode/tui.json` and `tui.jsonc`
+2. The file specified by `OPENCODE_TUI_CONFIG`
+3. `tui.json` and `tui.jsonc` discovered from the currently opened directory up to the filesystem root, then applied from the root side back toward the current directory; files closer to the current directory take priority
+4. `.opencode/tui.json` and `tui.jsonc` at each level
+5. Files with the same names in `OPENCODE_CONFIG_DIR`
+
+When both extensions exist in one configuration directory, `.json` is loaded first, followed by `.jsonc`. Configuration is deep-merged across layers, so project settings can override values from `OPENCODE_TUI_CONFIG`. Ordinary project files are applied from the root side toward the current directory, so the nearest one wins. Multiple `.opencode` directories are merged from the current side toward the root, so on conflicts the rootmost directory is loaded later and wins. `OPENCODE_CONFIG_DIR` is loaded last.
+
+### Legacy Configuration Migration Rules
+
+When the TUI starts, it checks old main configuration files directory by directory:
+
+- Migration checks cover the global main configuration, project main configurations discovered upward from the current directory, main configurations in configuration directories, and the file specified by `OPENCODE_CONFIG`.
+- If the target `tui.json` already exists in the same directory, migration for that entire directory is skipped. A `tui.jsonc` alone does not cause it to be skipped.
+- If the target does not exist, migration recognizes a string-valued `theme` and an object-valued `keybinds`. It decodes `scroll_speed`, `scroll_acceleration`, and `diff_style` from the legacy `tui` object against their corresponding schemas during migration, so invalid values are not written to the new, flat `tui.json`. The generated file is also fully schema-validated when loaded.
+- After the new file has been written successfully, OpenCode creates `<original-main-config>.tui-migration.bak`. An existing backup is reused rather than overwritten.
+- The three legacy fields are removed from the original main configuration only after the backup succeeds. Migration is not transactional: if the new `tui.json` has already been written but creating the backup or rewriting the original fails, the destination is not rolled back and the legacy fields may remain. The next launch sees the destination file, skips that directory, and does not retry automatically.
+- Whether or not migration occurs, the main configuration loader ignores `theme`, `keybinds`, and `tui`.
 
 ---
 
@@ -173,14 +208,14 @@ Define or override Agent behavior.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `description` | string | Brief description of the Agent, shown in `/agent` list. |
+| `description` | string | Brief description of the Agent, shown in the `/agents` list and Agent picker. |
 | `mode` | enum | Agent type. `"primary"`(standalone), `"subagent"`, `"all"`. |
 | `model` | string | Model ID specific to this Agent. |
 | `variant` | string | Default model variant (only effective when using the model configured for this Agent). |
 | `prompt` | string | System Prompt (persona instructions). |
-| `temperature` | number | Temperature coefficient (0.0 - 1.0). |
-| `top_p` | number | Nucleus sampling parameter (0.0 - 1.0). |
-| `steps` | number | Maximum automatic iteration steps. |
+| `temperature` | finite number | Temperature coefficient. Its valid range depends on the model and Provider; the OpenCode schema does not impose a universal 0–1 range. |
+| `top_p` | finite number | Nucleus sampling parameter. Its valid range depends on the model and Provider; the OpenCode schema does not impose a universal 0–1 range. |
+| `steps` | positive integer | Maximum automatic iterations; once reached, the Agent returns a final plain-text response. This counts iterations, not tool calls. |
 | `color` | string | Display color in interface (Hex format, e.g. `#FF0000`), or theme color name (e.g. `primary`). |
 | `hidden` | boolean | Whether to hide this Agent in `@` autocomplete menu. |
 | `permission` | object | Agent-specific permission configuration (overrides global permissions). |
@@ -193,14 +228,14 @@ Define or override Agent behavior.
 Control OpenCode's access to system resources.
 
 **Key name**: `permission` (singular)  
-**Type**: `Record<string, Rule | Action>`
+**Type**: Known permission keys are validated according to the two groups below; additional custom permission keys may use `Rule`
 
 Value can be one of the following strings (Action):
 - `"allow"`: Auto-allow
 - `"ask"`: Ask each time
 - `"deny"`: Deny
 
-Can also be an object (Rule) for finer control.
+Permission keys that support object rules (`Rule`) can apply finer-grained control by command or path pattern.
 
 ```json
 "permission": {
@@ -213,24 +248,15 @@ Can also be an object (Rule) for finer control.
 }
 ```
 
-**Available Permissions**:
-- `read`: Read files
-- `edit`: Edit/write files
-- `bash`: Execute commands
-- `glob`: File search
-- `grep`: Content search
-- `list`: List directory
-- `task`: Call sub-Agent
-- `external_directory`: Access external directories
-- `todowrite`: TODO write
-- `todoread`: TODO read
-- `question`: Question tool
-- `webfetch`: Access web pages
-- `websearch`: Search engine
-- `codesearch`: Code search
-- `lsp`: LSP operations
-- `doom_loop`: Infinite loop detection
-- `skill`: Skill invocation
+**Supports either `Rule` or `Action`**:
+- `read`, `edit`, `glob`, `grep`, `list`
+- `bash`, `task`, `external_directory`, `lsp`, `skill`
+
+**Supports `Action` only**:
+- `todowrite`, `question`
+- `webfetch`, `websearch`, `doom_loop`
+
+Additional custom permission keys may use object rules (`Rule`).
 
 ---
 
@@ -260,20 +286,25 @@ Define custom slash commands.
 
 ---
 
-## Keybinds Configuration (keybinds)
+## Keyboard Shortcut Configuration (tui.json → keybinds)
 
 Customize keyboard shortcuts.
 
-**Key name**: `keybinds` (**plural**)
+**Key name**: `keybinds` (**plural**, at the top level of `tui.json`)
 
-```json
-"keybinds": {
-  "leader": "ctrl+x",
-  "session_new": "<leader>n"
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session_new": "<leader>n"
+  }
 }
 ```
 
-Common options (see [Keybinds Reference](./keybinds.md) for complete list):
+A binding can be set to `"none"` or `false` to disable it. You can also provide one binding or an array of bindings.
+
+Common options (see the [keyboard shortcuts reference](/en/appendix/keybinds) for the complete list):
 
 - `leader`: Prefix key (default `ctrl+x`)
 - `app_exit`: Exit application
@@ -329,7 +360,7 @@ Enable experimental features in development. **Note: These features are unstable
 | `primary_tools` | string[] | Specify list of tools only available to Primary Agent. |
 | `mcp_timeout` | number | Global timeout for MCP requests (milliseconds). |
 
-> Hook functionality is implemented through the **plugin system**, not `experimental` configuration. See [Hooks Mechanism](../5-advanced/12c-hooks).
+> Hook functionality is implemented through the **plugin system**, not `experimental` configuration. See [Hooks](/en/5-advanced/12c-hooks).
 
 ---
 
@@ -388,13 +419,13 @@ List of plugins to load. Supports npm package names or local file paths.
 | `urls` | string[] | Remote Skill fetch URLs. |
 
 ### mcp
-Configure Model Context Protocol servers. See [MCP Documentation](../5-advanced/07a-mcp-basics).
+Configure Model Context Protocol servers. See the [MCP documentation](/en/5-advanced/07a-mcp-basics).
 
 ### formatter
-Configure code formatting tools. See [Formatter Documentation](../5-advanced/18-formatters).
+Configure code formatting tools. See the [formatter documentation](/en/5-advanced/18-formatters).
 
 ### lsp
-Configure LSP servers. See [LSP Documentation](../5-advanced/19-lsp).
+Configure LSP servers. See the [LSP documentation](/en/5-advanced/19-lsp).
 
 ### enterprise
 ```json
@@ -411,22 +442,15 @@ Configure GitHub Enterprise instance URL.
 <details>
 <summary><strong>Click to expand source code locations</strong></summary>
 
-> Last updated: 2026-02-14
+> Target version: v1.18.22 (commit `47b6b6f5f4f9b42d2bce7af1c4e5bf6efaf22ba7`)
 
-All configuration schemas are defined in `packages/opencode/src/config/config.ts`.
-
-| Configuration | Schema | Line Range |
-|---------------|--------|------------|
-| Top Level Info | `Info` | L1004-L1197 |
-| Provider | `Provider` | L951-L1001 |
-| Agent | `Agent` | L672-L758 |
-| Permission | `Permission` | L621-L652 |
-| Keybinds | `Keybinds` | L761-L917 |
-| TUI | `TUI` | L919-L931 |
-| Server | `Server` | L933-L944 |
-| Command | `Command` | L654-L661 |
-| Skills | `Skills` | L663-L670 |
-| MCP | `Mcp` | L523-L584 |
-| Experimental | `experimental` | L1172-L1192 |
+| Configuration Area | Pinned Source |
+| --- | --- |
+| Main configuration schema | [`packages/core/src/v1/config/config.ts` L32-L190](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L32-L190) |
+| Main configuration filters legacy TUI fields | [`packages/opencode/src/config/config.ts` L53-L61](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L53-L61) |
+| TUI schema | [`packages/tui/src/config/index.tsx` L61-L75](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) |
+| Shortcut values and default mappings | [`packages/tui/src/config/keybind.ts` L28-L159](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L28-L159) |
+| Automatic TUI migration | [`packages/opencode/src/config/tui-migrate.ts` L24-L132](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L132) |
+| TUI loading hierarchy | [`packages/opencode/src/config/tui.ts` L171-L209](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) |
 
 </details>

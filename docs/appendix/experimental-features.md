@@ -43,6 +43,8 @@ source ~/.zshrc
 # 只启用你需要的功能
 export OPENCODE_EXPERIMENTAL_LSP_TOOL=true
 export OPENCODE_EXPERIMENTAL_PLAN_MODE=true
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
 ```
 
 ---
@@ -94,7 +96,7 @@ export OPENCODE_EXPERIMENTAL_LSP_TY=true
 
 | 变量 | 说明 | 相关教程 |
 |------|------|---------|
-| `OPENCODE_EXPERIMENTAL_PLAN_MODE` | 启用计划模式（plan/build 分离） | [3.1 规划与构建](../3-workflow/01-plan-build) |
+| `OPENCODE_EXPERIMENTAL_PLAN_MODE` | 在 CLI 中暴露实验性的 `plan_exit` 工具 | [3.1 规划与构建](../3-workflow/01-plan-build) |
 
 **启用方式**：
 ```bash
@@ -106,9 +108,54 @@ export OPENCODE_EXPERIMENTAL_PLAN_MODE=true
 - 不确定最佳方案：先规划多套方案，选择后再动手
 - 需要人工审核：计划文件可以保存、分享、迭代
 
+> Build 和 Plan Agent 无论是否设置这个变量都会存在，你仍可手动切换 Agent。这个变量只控制 CLI 工具列表是否加入 `plan_exit`。
+
 **新增工具**：
-- `plan_enter`：切换到计划模式
-- `plan_exit`：计划完成，询问是否切换到构建模式
+- `plan_exit`：Plan Agent 完成计划后，询问是否切换到 Build
+
+目标版本没有 `plan_enter` 工具。进入 Plan Agent 请使用 <kbd>Tab</kbd> 或配置的 Agent 切换键。
+
+---
+
+### MCP Code Mode
+
+| 变量 | 说明 | 相关教程 |
+|------|------|---------|
+| `OPENCODE_EXPERIMENTAL_CODE_MODE` | 启用受限的 MCP 编排 `execute` 工具 | [5.7b MCP 进阶](../5-advanced/07b-mcp-advanced) |
+
+**启用方式**：
+```bash
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+```
+
+`execute` 只有在开关启用，并且当前 Agent 与会话权限下至少一个 MCP 工具可见时才会出现。它运行受限解释器代码，只能访问可见 MCP 工具组成的目录；不能当作 shell 使用，每次 MCP 调用仍执行原工具权限检查。
+
+源码：[运行时开关](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L48)、[`execute` 可见条件](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L280-L308)、[受限执行环境](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L239-L274)。
+
+---
+
+### 后台 Subagent
+
+| 变量 | 说明 |
+|------|------|
+| `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS` | 允许 `task` 使用 `background: true`，并支持把运行中的同步子代理转入后台 |
+
+**启用方式**：
+```bash
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+```
+
+该开关只控制后台能力。子代理能否继续启动子代理由根级 `subagent_depth` 配置控制，默认值是 `1`，即主 Agent 可以启动一层子代理，但该子代理不能再嵌套启动子代理：
+
+```jsonc
+{
+  "subagent_depth": 2
+}
+```
+
+把深度调大前应确认权限边界和任务成本；达到上限后，`task` 会直接报错，而不是静默降级。
+
+源码：[后台实验开关](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L43)、[后台检查与深度限制](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L96-L115)、[`subagent_depth` Schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L84-L86)。
 
 ---
 
@@ -130,7 +177,7 @@ export OPENCODE_EXPERIMENTAL_WORKSPACES=1
 
 **TUI 操作**：
 - 输入 `/workspaces` 打开工作区列表
-- 或按 `Ctrl+X` 打开命令面板 → 输入 "workspace"
+- 或按 `Ctrl+P` 打开命令面板 → 输入 "workspace"
 - 可以创建、切换、删除工作区
 
 **当前支持的工作区类型**：
@@ -254,7 +301,9 @@ export OPENCODE_EXPERIMENTAL_ICON_DISCOVERY=true   # 自动发现项目图标
 # ───────────────────────────────────────────────────────────────
 # 工作流增强
 # ───────────────────────────────────────────────────────────────
-export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # 启用计划模式
+export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # 在 CLI 中暴露 plan_exit 工具
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true  # 启用受限 MCP 编排工具
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true  # 启用后台子代理
 
 # ───────────────────────────────────────────────────────────────
 # 工作区管理
@@ -300,9 +349,10 @@ export OPENCODE_EXPERIMENTAL_OXFMT=true      # 启用 oxfmt 格式化器
 
 ### 如何关闭某个功能？
 
-移除或注释掉对应的环境变量即可：
+如果没有启用总开关 `OPENCODE_EXPERIMENTAL`，移除或注释对应的专用变量即可。若总开关为 `true`，专用变量未设置时会回退到总开关，此时要显式设为 `false`，或关闭总开关：
 ```bash
-# export OPENCODE_EXPERIMENTAL_PLAN_MODE=true  # 注释掉就关闭了
+export OPENCODE_EXPERIMENTAL_PLAN_MODE=false
+# 或移除/关闭 OPENCODE_EXPERIMENTAL=true
 ```
 
 ---

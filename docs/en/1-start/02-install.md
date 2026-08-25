@@ -9,10 +9,10 @@ practice: "5 min"
 level: "Beginner"
 description: "One-click install OpenCode AI coding assistant. Supports macOS, Windows, and Linux. Complete installation and setup in 5 minutes."
 tags:
-  - Installation
-  - macOS
-  - Windows
-  - Linux
+  - "Installation"
+  - "macOS"
+  - "Windows"
+  - "Linux"
 prerequisite:
   - "1.1 What is This"
 ---
@@ -237,13 +237,15 @@ scoop install extras/opencode-desktop
 | Feature | Terminal (TUI) | Desktop |
 |---------|----------------|---------|
 | Interface | Command line | Graphical window |
-| System Notifications | ❌ None | ✅ Auto-notify on task completion |
+| System Notifications | ✅ Supported, disabled by default | ✅ Auto-notify on task completion |
 | Multiple Windows | ❌ Single window | ✅ Supports multiple tabs |
 | Installation Complexity | Simple | Slightly complex (need to download installer) |
 
 ::: tip Recommendation
 Install both. Use the terminal version for daily work (more efficient), and the desktop version for long-running tasks (can minimize, notifies you when done).
 :::
+
+To enable terminal notifications, set `attention.enabled: true` in `tui.json`. Use `attention.notifications` to choose which events—such as questions, permission requests, completion, and errors—trigger notifications. This feature is disabled by default.
 
 ---
 

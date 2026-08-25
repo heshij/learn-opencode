@@ -67,7 +67,7 @@ prerequisite:
 
 ## 核心思路
 
-OpenCode 提供了两套使用方式：
+OpenCode 提供了四类终端使用方式：
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -83,6 +83,13 @@ OpenCode 提供了两套使用方式：
 │   │  • 实时对话     │              │  • 适合 CI/CD   │                  │
 │   │  • 人工决策     │              │  • 自动化流程   │                  │
 │   └─────────────────┘              └─────────────────┘                  │
+│                                                                          │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │                      精简交互模式                                 │   │
+│   │                                                                   │   │
+│   │  opencode --mini   →  精简界面，适合连续对话与 Shell 操作         │   │
+│   │                                                                   │   │
+│   └─────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 │   ┌─────────────────────────────────────────────────────────────────┐   │
 │   │                      服务器模式                                   │   │
@@ -101,9 +108,27 @@ OpenCode 提供了两套使用方式：
 | 模式 | 命令 | 特点 |
 |------|------|------|
 | TUI | `opencode` | 交互式，适合人工操作 |
+| Mini | `opencode --mini` | 精简交互界面，保留连续输入与会话回放 |
 | Run | `opencode run` | 非交互式，执行完退出 |
 | Serve | `opencode serve` | 无头服务器，只暴露 API |
 | Web | `opencode web` | 带 Web 界面的服务器 |
+
+### 精简交互模式：opencode --mini
+
+`opencode --mini` 是精简交互界面的公开入口。不要写成 `opencode run --mini`；`opencode run` 默认仍是执行一次任务后退出的非交互命令。
+
+```bash
+# 启动精简交互界面
+opencode --mini
+
+# 继续最近会话；默认回放会话历史，并在终端缩放后重新回放
+opencode --mini --continue
+
+# 继续会话，但关闭历史回放
+opencode --mini --continue --no-replay
+```
+
+在 Mini 输入框开头输入 `!` 会进入 **Shell mode**。继续输入命令并提交即可执行；按 <kbd>Esc</kbd> 可直接退出，或在光标位于输入开头时按 <kbd>Backspace</kbd> 退出。
 
 ---
 
@@ -111,7 +136,7 @@ OpenCode 提供了两套使用方式：
 
 ### 1.1 基本用法
 
-`opencode run` 是最常用的 CLI 命令，它会执行完任务后自动退出。
+`opencode run` 是最常用的 CLI 命令。即使从终端直接运行，它默认也不会进入交互界面，而是执行完任务后自动退出。
 
 ```bash
 # 最简单的用法
@@ -621,16 +646,18 @@ opencode uninstall --dry-run
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-02-14
+> 版本基准：[`v1.18.22`](https://github.com/anomalyco/opencode/tree/v1.18.22)
 
 | 功能 | 文件路径 | 行号 |
 |-----|---------|------|
-| `opencode run` 命令实现 | [`src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/run.ts#L215-L614) | 215-614 |
-| `opencode serve` 命令实现 | [`src/cli/cmd/serve.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/serve.ts#L6-L20) | 6-20 |
-| `opencode web` 命令实现 | [`src/cli/cmd/web.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/web.ts) | 全文件 |
-| `opencode pr` 命令实现 | [`src/cli/cmd/pr.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/pr.ts#L6-L112) | 6-112 |
-| 服务器安全检查 | [`src/flag/flag.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/flag/flag.ts#L31-L32) | 31-32 |
-| 服务器认证逻辑 | [`src/server/server.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/server/server.ts#L84-L87) | 84-87 |
+| `run` 默认非交互与 Mini 入口 | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L3-L15) | 3-15 |
+| `--mini`、`--no-replay` 参数与入口转发 | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L123-L175) | 123-175 |
+| Mini Shell mode | [`packages/opencode/src/cli/cmd/run/footer.prompt.tsx`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run/footer.prompt.tsx#L1055-L1094) | 1055-1094 |
+| `opencode serve` 命令实现 | [`packages/opencode/src/cli/cmd/serve.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/serve.ts#L6-L24) | 6-24 |
+| `opencode web` 命令实现 | [`packages/opencode/src/cli/cmd/web.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/web.ts#L31-L84) | 31-84 |
+| `opencode pr` 命令实现 | [`packages/opencode/src/cli/cmd/pr.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/pr.ts#L8-L115) | 8-115 |
+| 服务器认证环境变量 | [`packages/core/src/flag/flag.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/flag/flag.ts#L32-L33) | 32-33 |
+| 服务器认证逻辑 | [`packages/opencode/src/server/auth.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/auth.ts#L17-L47) | 17-47 |
 
 **关键环境变量**：
 - `OPENCODE_SERVER_PASSWORD`：服务器密码

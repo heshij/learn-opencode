@@ -154,6 +154,33 @@ Skill 不是把所有内容塞进上下文，而是**分层加载**：
 
 > 项目路径会从当前目录向上遍历到 git 根目录。
 
+### 项目 references 不是 Skill 的 `references/`
+
+Skill 内的 `references/` 只是该 Skill 自己约定的资料目录。`opencode.json` 顶层的 `references` 是另一项能力：它把本地目录或 Git 仓库注册为项目上下文。
+
+```jsonc
+{
+  "references": {
+    "backend": {
+      "path": "../backend",
+      "description": "后端服务源码"
+    },
+    "design-system": {
+      "repository": "https://github.com/example/design-system.git",
+      "branch": "main",
+      "description": "组件与设计规范",
+      "hidden": true
+    }
+  }
+}
+```
+
+- 本地项使用 `path`；Git 项使用 `repository`，可选 `branch`。
+- `description` 存在时，该 reference 会列入系统上下文；`hidden: true` 只把它从 TUI 的 `@` 补全中隐藏。
+- 使用复数键 `references`。单数 `reference` 在 `v1.18.22` 中仍兼容，但已经弃用。
+
+Schema 见 [`reference.ts:5-21`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/config/reference.ts#L5-L21)，系统上下文注入见 [`system.ts:69-92`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L69-L92)，TUI 隐藏逻辑见 [`autocomplete.tsx:423-439`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/component/prompt/autocomplete.tsx#L423-L439)。
+
 ::: info 自定义配置目录
 通过 `OPENCODE_CONFIG_DIR` 环境变量可以指定额外的 Skill 搜索路径：
 
@@ -167,12 +194,7 @@ OpenCode 会同时扫描以下位置：
 
 这对于团队共享 Skill 或在不同环境中使用不同的 Skill 集合非常有用。
 
-源码证据：`skill/skill.ts:82-85`
-```typescript
-const configDirs = process.env.OPENCODE_CONFIG_DIR
-  ? [process.env.OPENCODE_CONFIG_DIR, ...defaultConfigDirs]
-  : defaultConfigDirs
-```
+`v1.18.22` 从配置服务取得全部配置目录，再扫描其中的 `{skill,skills}/**/SKILL.md`（源码：[`skill/index.ts:205-208`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L205-L208)）。
 :::
 
 ### 嵌套目录支持
@@ -187,12 +209,20 @@ OpenCode 支持嵌套的 Skill 目录：
             └── SKILL.md    # 技能名由 frontmatter 中的 name 决定
 ```
 
-源码证据：`skill/skill.ts:38`
+源码证据：[`skill/index.ts:21-25`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L21-L25)
 ```typescript
-const OPENCODE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
+const OPENCODE_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
 ```
 
 `**` 表示匹配任意深度的子目录。
+
+### 内置 `customize-opencode` Skill
+
+`v1.18.22` 默认注册 `customize-opencode`，用于修改 OpenCode 自身配置、Agent、Skill、插件、MCP 和权限。它先于磁盘 Skill 注册，因此你可以用同名本地 Skill 覆盖内置版本（源码：[`skill/index.ts:27-35`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L27-L35)、[`skill/index.ts:276-284`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L276-L284)）。
+
+::: info Scout 是历史能力，不是当前 Agent
+Scout 曾在本次同步范围内加入，但已于 `v1.16.0` 移除。不要在 `v1.18.22` 的 Agent 列表或工作流中继续依赖 Scout；需要探索代码库时，应使用当前可见的 Agent 与工具。
+:::
 
 ---
 

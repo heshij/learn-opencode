@@ -1,5 +1,5 @@
 ---
-title: "Plan vs Build: Planning and Execution"
+title: "Plan vs Build: Permissions and Workflow | OpenCode Tutorial"
 subtitle: "Two modes, two purposes"
 course: "OpenCode Practical Course"
 stage: "Stage 3"
@@ -7,11 +7,11 @@ lesson: "3.1"
 duration: "10 min"
 practice: "15 min"
 level: "Beginner"
-description: "Understand Plan Agent (read-only analysis) and Build Agent (read-write execution), master the permission system, switch flexibly with Tab key, and master efficient AI programming workflow."
+description: "Learn how Plan Agent performs read-only analysis, Build Agent executes with write access, permission prompts work, and Tab switches modes for AI coding."
 tags:
-  - Plan
-  - Build
-  - Mode
+  - "Plan"
+  - "Build"
+  - "Mode"
 prerequisite:
   - "2.1 Interface and Basic Operations"
 ---
@@ -80,21 +80,21 @@ Plan and Build are two built-in **Primary Agents** in OpenCode.
 OpenCode provides two Primary Agents by default:
 
 | Agent | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | **Build** | Primary | Default assistant, all tools available, suitable for development work |
 | **Plan** | Primary | Restricted assistant, permission-based, suitable for analysis and planning |
 
 ### Permission System
 
-Plan Agent uses a **permission isolation** mechanism to protect your code—it's prohibited from editing source code, only allowed to edit plan files:
+Plan Agent uses a **permission isolation** mechanism to protect your code—it cannot edit source code and may edit only project-level or global plan files:
 
 | Permission | Plan Agent | Build Agent |
-|------|-----------|------------|
+| --- | --- | --- |
 | `edit` (write/modify files) | **deny** (source code forbidden, plan files only) | allow |
 | `bash` (execute commands) | allow | allow |
 | `read`, `grep`, `glob`, etc. | allow | allow |
 
-> ⚠️ **Note**: Plan Agent can edit `.opencode/plans/*.md` plan files, but cannot edit project source code.
+> ⚠️ **Note**: Plan Agent can edit project-level `.opencode/plans/*.md` files and plan files in the global data directory, but it cannot edit project source code.
 
 ### When to Use Plan
 
@@ -113,7 +113,7 @@ Plan Agent uses a **permission isolation** mechanism to protect your code—it's
 ### Mode Selection Quick Reference
 
 | Your Need | Recommended Mode | Reason |
-|---------|---------|------|
+| --- | --- | --- |
 | Write new feature | Build | Direct development is efficient |
 | Fix simple bug | Build | Impact scope is clear |
 | Refactor core module | Plan first, then Build | Analyze impact before acting |
@@ -130,25 +130,30 @@ Plan Agent uses a **permission isolation** mechanism to protect your code—it's
 ## Available Tools
 <AdInArticle />
 
-Plan Agent can use read-only tools, Build Agent can use all tools:
+Plan Agent can read and search files and run shell commands, but it cannot edit source code by default. Build Agent can use all tools:
 
 ### Read-Only Tools (Available to Both Plan and Build)
 
 | Tool | Description |
-|------|------|
+| --- | --- |
 | `read` | Read file contents |
 | `grep` | Search file contents |
 | `glob` | Find files by pattern |
 | `list` | List directory contents |
 | `webfetch` | Fetch web content |
 
-### Read-Write Tools (Only Build by Default)
+### Write Tools (Only Build by Default)
 
 | Tool | Description |
-|------|------|
+| --- | --- |
 | `write` | Create new files |
 | `edit` | Modify existing files |
-| `bash` | Execute Shell commands |
+
+### Execution Tools (Available to Both Plan and Build)
+
+| Tool | Description |
+| --- | --- |
+| `bash` | Execute shell commands; individual commands remain subject to permission rules |
 
 ---
 
@@ -190,7 +195,7 @@ The default configuration is sufficient for daily use. If you need to customize 
 **Configuration Options**:
 
 - `model`: Model to use, format is `provider/model-id`
-- `temperature`: Controls randomness (0-1), lower values are more focused
+- `temperature`: A finite number that controls randomness. The valid range depends on the model and Provider; for many models, lower values produce more focused output
 - `permission.edit`: File edit permission
   - `"allow"`: Allow editing
   - `"deny"`: Deny editing
@@ -259,6 +264,8 @@ If not satisfied, you can undo.
 /undo
 ```
 
+`/undo` returns to the previous user message and rolls back file patches associated with everything after that message. If you undo too far, use `/redo` to restore both the session and its files. File restoration depends on snapshots: `snapshot: false` disables file undo/redo, but it does not disable undo/redo for session messages.
+
 ---
 
 ## Tip: Let AI Track Task Progress
@@ -266,7 +273,7 @@ If not satisfied, you can undo.
 For complex tasks, explicitly tell AI to track progress with TODO:
 
 | What You Say | What AI Does |
-|---------|------------|
+| --- | --- |
 | "Track progress with TODO" | Creates task list, updates status step by step |
 | "Complete in steps" | Automatically breaks down tasks, updates while working |
 | "How's the current progress?" | Reports completed/in-progress/pending |
@@ -301,7 +308,7 @@ AI: Let me check...
 - You might leave midway and want to know progress when returning
 - You want AI to execute methodically without missing steps
 
-> 💡 **How it works**: AI has internal `todoread` and `todowrite` tools. You don't need to know the details, just say "track with TODO" in your prompt.
+> 💡 **How it works**: AI uses the `todowrite` tool to maintain and read the current todo list. You do not need to manage the tool directly—just say "track with TODO" in your prompt.
 
 ---
 
@@ -310,7 +317,7 @@ AI: Let me check...
 > All must pass to continue
 
 - [ ] <kbd>Tab</kbd> can switch between Plan Agent and Build Agent
-- [ ] Plan Agent is prohibited from editing source code, only `.opencode/plans/*.md` plan files
+- [ ] Plan Agent is prohibited from editing source code and can edit only project-level or global plan files
 - [ ] Build Agent can freely modify files and execute commands
 - [ ] Know how to let AI track task progress with TODO
 
@@ -319,10 +326,10 @@ AI: Let me check...
 ## Common Pitfalls
 
 | Symptom | Cause | Solution |
-|-----|-----|-----|
+| --- | --- | --- |
 | Want AI to modify files but it doesn't | Might be in Plan Agent, which is prohibited from editing source code | Press Tab to switch to Build |
 | AI modified files it shouldn't | In Build Agent, permission is `allow` | Use `/undo` to revert, use Plan to analyze first next time |
-| Plan Agent can't edit source code | This is by design, Plan can only edit plan files | Switch to Build to make modifications |
+| Plan Agent can't edit source code | This is by design; by default, Plan can edit only project-level or global plan files | Switch to Build to make modifications |
 
 ---
 
@@ -332,15 +339,15 @@ AI: Let me check...
 
 Plan Agent typically uses lower `temperature` (e.g., 0.1) for more focused and deterministic output; Build Agent uses medium values (e.g., 0.3) to balance focus and creativity.
 
-### maxSteps: Limit Iterations
+### steps: Limit Automatic Iterations
 
-You can set the maximum number of tool calls an Agent can execute to avoid over-operation or excessive costs.
+Set `steps` to a positive integer to limit an Agent's automatic iterations. Once it reaches the limit, the Agent produces a final plain-text response. A single iteration can contain multiple tool calls, so this is not a hard limit on the number of tool calls.
 
 ```jsonc
 {
   "agent": {
     "plan": {
-      "steps": 5  // Maximum 5 tool calls
+      "steps": 5  // Maximum 5 automatic iterations
     }
   }
 }
@@ -348,10 +355,11 @@ You can set the maximum number of tool calls an Agent can execute to avoid over-
 
 ### Custom Keybinds
 
-By default, <kbd>Tab</kbd> switches Agents, but you can modify `agent_cycle` keybinding in configuration:
+By default, <kbd>Tab</kbd> switches Agents, but you can change the `agent_cycle` keybinding in a separate `tui.jsonc` file:
 
-```jsonc
+```jsonc title="tui.jsonc"
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "agent_cycle": "tab",           // Switch to next Agent (default)
     "agent_cycle_reverse": "shift+tab"  // Switch to previous Agent (default)
@@ -359,10 +367,12 @@ By default, <kbd>Tab</kbd> switches Agents, but you can modify `agent_cycle` key
 }
 ```
 
-### plan_enter / plan_exit: AI Auto-Switches Modes
+Since v1.17.0, `theme`, `keybinds`, and the legacy `tui` field no longer belong in the main `opencode.json`/`opencode.jsonc`. When the TUI starts, it migrates these legacy fields by configuration directory: if the destination `tui.json` already exists, that directory is skipped; after a successful write, it backs up the original main configuration and removes the legacy fields from it. The separate TUI configuration continues to load at the global, custom, project, and `.opencode` levels, and you can also use `tui.jsonc` directly.
+
+### plan_exit: Let the Plan Agent Request Execution
 
 ::: warning ⚠️ Experimental Feature
-These two tools are currently **experimental features** and require all of the following conditions:
+`plan_exit` is currently an **experimental feature** and requires all of the following conditions:
 
 1. Enable experimental mode: Set `OPENCODE_EXPERIMENTAL=true` or `OPENCODE_EXPERIMENTAL_PLAN_MODE=true`
 2. Use CLI client: Run OpenCode in terminal (not Web/IDE integration)
@@ -370,21 +380,16 @@ These two tools are currently **experimental features** and require all of the f
 Future versions may officially release this feature, and this tutorial will be updated accordingly.
 :::
 
-Besides manually pressing <kbd>Tab</kbd> to switch, AI can also **actively call tools** to switch modes:
+Enter the Plan Agent manually with <kbd>Tab</kbd> (or your configured Agent-switching key). The target version does not implement a `plan_enter` tool. After planning, the Plan Agent can call `plan_exit` to request a return to Build:
 
 | Tool | Purpose | Available To |
-|------|------|-----------|
-| `plan_enter` | Enter Plan mode | Build Agent |
+| --- | --- | --- |
 | `plan_exit` | Exit Plan mode, return to Build | Plan Agent |
 
 **Workflow**:
 
 ```
-You: This module needs refactoring, help me analyze first, don't modify directly
-
-AI: [Calls plan_enter tool]
-    → Confirmation popup: Switch to Plan mode?
-    → You choose Yes
+You: [Press Tab to switch to the Plan Agent]
     → AI analyzes code in Plan mode
     → Generates plan file .opencode/plans/xxx.md
 
@@ -396,22 +401,22 @@ AI: [Calls plan_exit tool]
     → AI executes modifications in Build mode
 ```
 
-**In Plan mode, AI can only edit plan files** (`.opencode/plans/*.md`), not source code. This ensures safe separation between "planning" and "execution".
+**In Plan mode, AI can edit only project-level or global plan files by default**, not source code. This ensures safe separation between "planning" and "execution."
 
 ### Plan File Storage Location
 
 In Plan mode, AI-generated plan files are saved to:
 
 | Level | Path | Description |
-|------|------|------|
+| --- | --- | --- |
 | Project-level | `.opencode/plans/<created>-<slug>.md` | Saved in project directory, follows project |
-| Global-level | `~/.local/share/opencode/plans/<created>-<slug>.md` | Saved in global directory, shared across projects |
+| Global-level | `<Global.Path.data>/plans/<created>-<slug>.md` | Saved in OpenCode's global data directory and shared across projects |
 
-> `created` is creation timestamp, `slug` is URL-friendly format of plan title. Example: `1736854321-refactor-auth.md`
+> `created` is a 13-digit millisecond timestamp, and `slug` is a URL-friendly version of the plan title. Example: `1736854321000-refactor-auth.md`. A common Linux default for the data directory is `~/.local/share/opencode`, but the actual path depends on the platform and XDG environment variables. Run `opencode debug paths` and check `data` to find it.
 
 ::: tip Storage Location Rules
 - **Project has Git (or other VCS)** → Saved to project-level `.opencode/plans/`
-- **Project has no VCS** → Saved to global-level `~/.local/share/opencode/plans/`
+- **Project has no VCS** → Saved to `<Global.Path.data>/plans/`
 :::
 
 View plan files:
@@ -420,8 +425,8 @@ View plan files:
 # View project-level plans
 cat .opencode/plans/*.md
 
-# View global-level plans
-cat ~/.local/share/opencode/plans/*.md
+# View the global data directory, then append plans/ to the reported data path
+opencode debug paths
 ```
 
 > 💡 These features can be explored in depth later, understanding them at this stage is sufficient.
@@ -435,7 +440,7 @@ You learned:
 1. Plan and Build are two Primary Agents
 2. Switch between Agents with <kbd>Tab</kbd> (or configured `agent_cycle`)
 3. Plan is for analysis and planning (prohibited from editing source code), Build is for development and execution (all tools available)
-4. Plan Agent can only edit `.opencode/plans/*.md` plan files
+4. By default, Plan Agent can edit only project-level or global plan files, not source code
 5. For complex tasks, tell AI to "track progress with TODO" for methodical execution
 
 ---
@@ -450,16 +455,19 @@ You learned:
 > Last updated: 2026-02-14
 
 | Feature | File Path | Line Numbers |
-|-----|---------|------|
+| --- | --- | --- |
 | Build Agent definition | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L77-L91) | 77-91 |
 | Plan Agent definition | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L92-L114) | 92-114 |
 | Default permission rules | [`packages/opencode/src/agent/agent.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/agent/agent.ts#L55-L73) | 55-73 |
-| plan_enter tool | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/plan.ts#L75-L130) | 75-130 |
-| plan_exit tool | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/plan.ts#L20-L73) | 20-73 |
+| plan_exit tool | [`packages/opencode/src/tool/plan.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/plan.ts#L13-L79) | 13-79 |
 | Plan mode prompt | [`packages/opencode/src/session/prompt.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/prompt.ts#L1451-L1455) | 1451-1455 |
+| undo/revert and file-patch rollback | [`packages/opencode/src/session/revert.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L88) | 38-88 |
+| redo/unrevert and file restoration | [`packages/opencode/src/session/revert.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L91-L98) | 91-98 |
+| Scope of `snapshot: false` | [`packages/core/src/v1/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55) | 52-55 |
+| Automatic TUI configuration migration | [`packages/opencode/src/config/tui-migrate.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67) | 24-67 |
+| TUI configuration loading hierarchy | [`packages/opencode/src/config/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) | 171-209 |
 
 **Key Constants**:
-- `plan_enter`: Tool to switch from Build to Plan
 - `plan_exit`: Tool to switch from Plan to Build
 
 **Permission Actions**:

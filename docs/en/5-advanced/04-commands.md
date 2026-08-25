@@ -7,7 +7,7 @@ lesson: "5.4"
 duration: "15 minutes"
 practice: "15 minutes"
 level: "Advanced"
-description: "Customize slash commands to trigger complex tasks with /command-name for improved efficiency."
+description: "Learn to create OpenCode slash commands with Markdown or JSON, pass arguments, embed shell output and files, choose Agents, and override built-ins."
 tags:
   - "command"
   - "shortcut"
@@ -54,7 +54,7 @@ Key takeaways from this lesson:
 ## Command File Locations
 
 | Location | Scope | Notes |
-|-----|---------|------|
+| --- | --- | --- |
 | `.opencode/command/**/*.md` | Current project | Supports nested directories |
 | `.opencode/commands/**/*.md` | Current project | `commands` plural form also supported |
 | `~/.config/opencode/command/**/*.md` | Global | Shared across all projects |
@@ -84,9 +84,9 @@ Create `.opencode/command/test.md`:
 
 ```markdown
 ---
-description: Run tests and show coverage
-agent: build
-model: anthropic/claude-opus-4-5-thinking
+description: "Run tests and show coverage"
+agent: "build"
+model: "anthropic/claude-opus-4-5-thinking"
 ---
 
 Run the complete test suite and generate a coverage report.
@@ -138,7 +138,7 @@ Command description, displayed in the TUI command list.
 
 ```markdown
 ---
-description: Quick code review
+description: "Quick code review"
 ---
 ```
 
@@ -148,7 +148,7 @@ Specify which agent executes this command.
 
 ```markdown
 ---
-agent: plan
+agent: "plan"
 ---
 ```
 
@@ -165,7 +165,7 @@ Override the model used for this command.
 
 ```markdown
 ---
-model: anthropic/claude-opus-4-5-thinking
+model: "anthropic/claude-opus-4-5-thinking"
 ---
 ```
 
@@ -196,7 +196,7 @@ Pass all content after the command as arguments.
 
 ```markdown
 ---
-description: Create React component
+description: "Create React component"
 ---
 
 Create a React component named $ARGUMENTS with TypeScript type support.
@@ -210,7 +210,7 @@ Reference each argument by position.
 
 ```markdown
 ---
-description: Create specified file
+description: "Create specified file"
 ---
 
 Create a file named $1 in directory $2 with content: $3
@@ -234,7 +234,7 @@ Execute a shell command and embed the output in the prompt.
 
 ```markdown
 ---
-description: Analyze test coverage
+description: "Analyze test coverage"
 ---
 
 Current test results:
@@ -247,7 +247,7 @@ Another example:
 
 ```markdown
 ---
-description: Review recent changes
+description: "Review recent changes"
 ---
 
 Recent Git commits:
@@ -264,7 +264,7 @@ Reference file contents.
 
 ```markdown
 ---
-description: Review component
+description: "Review component"
 ---
 
 Review the @src/components/Button.tsx component.
@@ -288,8 +288,8 @@ Check for performance issues and provide improvement suggestions.
 
 ```markdown
 ---
-description: Review code quality of specified file
-agent: plan
+description: "Review code quality of specified file"
+agent: "plan"
 ---
 
 @$1
@@ -309,7 +309,7 @@ Usage: `/review src/main.ts`
 
 ```markdown
 ---
-description: Generate commit message from changes
+description: "Generate commit message from changes"
 ---
 
 Generate a commit message based on the following changes:
@@ -329,7 +329,7 @@ Usage: `/commit`
 
 ```markdown
 ---
-description: Translate to Chinese
+description: "Translate to Chinese"
 subtask: true
 ---
 
@@ -351,7 +351,7 @@ Create a file with the same name to override built-in commands.
 ### Overridable Built-in Commands
 
 | Command | Function | Aliases |
-|-----|------|------|
+| --- | --- | --- |
 | `/connect` | Add Provider | - |
 | `/compact` | Compress current session | `/summarize` |
 | `/details` | Toggle tool execution details | - |
@@ -362,14 +362,18 @@ Create a file with the same name to override built-in commands.
 | `/init` | Create/update AGENTS.md | - |
 | `/models` | List available models | - |
 | `/new` | New session | `/clear` |
-| `/redo` | Redo | - |
+| `/redo` | Restore undone session content and associated files | - |
 | `/sessions` | List/switch sessions | `/resume`, `/continue` |
 | `/share` | Share session | - |
 | `/themes` | List themes | - |
-| `/undo` | Undo | - |
+| `/undo` | Return to the previous user message and roll back associated files | - |
 | `/unshare` | Unshare | - |
 
 > **Source**: [Official Docs - TUI Commands](https://opencode.ai/docs/tui#commands)
+
+`/undo` and `/redo` do more than hide or restore messages: they also use snapshots to roll back or restore associated files. If the main configuration sets `"snapshot": false`, you can still undo and redo the session, but the files will not be restored with it.
+
+> **Source (v1.18.22)**: [`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98) and [`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)
 
 ### Override Example
 
@@ -377,7 +381,7 @@ Create a file with the same name to override built-in commands.
 
 ```markdown
 ---
-description: Project-specific help
+description: "Project-specific help"
 ---
 
 This is project-specific help information.
@@ -394,7 +398,7 @@ This is project-specific help information.
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-----|-----|-----|
+| --- | --- | --- |
 | Command not showing | File not in correct directory | Ensure file is in `command/` or `commands/` directory |
 | Command name error | Filename contains special characters | Command name comes from file path, use `-` instead of spaces |
 | Parameters not working | Syntax error | Use `$ARGUMENTS` or `$1`, `$2` |

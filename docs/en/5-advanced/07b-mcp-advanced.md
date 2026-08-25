@@ -1,5 +1,5 @@
 ---
-title: "5.7b MCP Advanced"
+title: "5.7b Advanced MCP"
 subtitle: "OAuth, Permission Management & Common Services"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
@@ -9,15 +9,15 @@ practice: "20 minutes"
 level: "Advanced"
 description: "Learn MCP OAuth authentication, permission management, and common service integration to build a secure extension system."
 tags:
-  - MCP
-  - OAuth
-  - Permission Management
+  - "MCP"
+  - "OAuth"
+  - "Permission Management"
 prerequisite:
   - "5.7a MCP Basics"
   - "5.5 Permissions"
 ---
 
-# 5.7b MCP Advanced
+# 5.7b Advanced MCP
 
 > 💡 **TL;DR**: Master OAuth authentication, permission management, and common MCP service configuration.
 
@@ -220,7 +220,7 @@ Use wildcards to batch disable:
 }
 ```
 
-### Per-Agent Enable
+### Enable Tools for a Specific Agent
 
 After global disable, enable in specific agents:
 
@@ -280,6 +280,10 @@ filesystem server's read_file tool → filesystem_read_file
 context7 server's search tool     → context7_search
 ```
 
+Any character in a server or tool name that is not a letter, number, underscore, or hyphen is replaced with an underscore. `v1.18.22` still uses the legacy format shown above. The `mcp__server_name__tool_name` form appeared briefly during development and was later reverted; do not base current permission rules or prompts on it.
+
+Source: [current tool-name sanitization and concatenation rules](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/catalog.ts#L117-L119).
+
 ### Auto-Discovery Mechanism
 
 After configuring an MCP server, OpenCode **automatically discovers** all tools the server provides:
@@ -298,6 +302,42 @@ If the MCP server's tool list changes (tools added/removed), OpenCode **automati
 - No need to restart OpenCode
 
 This means: after upgrading an MCP server version, new tools become automatically available.
+
+### Server Instructions
+
+An MCP server can return instructions in its initialization result. OpenCode adds instructions from connected servers to the system prompt. If a server provides tools but every one of those tools is disabled by the current Agent or session permissions, its instructions are not injected.
+
+Source: [permission filtering and injection of instructions](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L119-L134).
+
+### Resources and Templates
+
+As long as at least one connected server declares the `resources` capability, OpenCode provides three general-purpose tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `list_mcp_resources` | List resources from every server or from one specified server |
+| `list_mcp_resource_templates` | List resource templates with URI parameters |
+| `read_mcp_resource` | Read a resource by server name and exact URI |
+
+Resources can be files, database schemas, or context supplied by the service itself. For a template, first fill in its URI parameters, then pass the resulting URI to `read_mcp_resource`. The app also supports finding and adding MCP resources through `@` completion.
+
+Source: [tool names](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L27-L31), [resource capability check](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L136-L155), [templates](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L222-L245), [reading resources](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L305-L325), and [in-app resource completion](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/app/src/components/prompt-input/slash-popover.tsx#L120-L163).
+
+---
+
+## Experimental MCP Code Mode
+
+Set this environment variable, then restart OpenCode:
+
+```bash
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+```
+
+Enabling the flag does not guarantee that `execute` will appear. It is registered for the model only when at least one MCP tool is visible under the current Agent and session permissions. Once enabled, ordinary MCP tools are no longer exposed individually; instead, `execute` orchestrates their calls.
+
+`execute` runs code in a restricted interpreter, not in a regular shell. It can access only the namespaced MCP tools that are visible, and every actual MCP call still passes through the original tool's permission check. Code Mode is useful for orchestrating several MCP calls at once, not for running arbitrary local programs or accessing unauthorized tools.
+
+Source: [filtering visible MCP tools](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L188-L212), [restricted runtime](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L239-L274), and [conditions for exposing `execute`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L280-L308).
 
 ---
 
@@ -498,13 +538,13 @@ Interact with Slack workspace:
 | MCP tools not appearing | Globally disabled or agent not configured | Check `permission` configuration |
 | OAuth authentication failed | Token expired or invalid credentials | Run `opencode mcp logout && opencode mcp auth` |
 | Status shows `needs_client_registration` | Server doesn't support dynamic registration | Configure `clientId` in `oauth` |
-| Context quickly exhausted | Too many MCP tools enabled | Disable unused MCPs, use per-agent enable |
+| Context quickly exhausted | Too many MCP tools enabled | Disable unused MCPs and enable them only for the Agents that need them |
 | Tool name conflicts | Multiple MCPs have same-named tools | Use `{server_name}_{tool_name}` format to distinguish |
 | Still shows needs_auth after auth | Token storage failed | Check `~/.local/share/opencode/mcp-auth.json` permissions |
 | **Command format error** | `command` written as string instead of array | ❌ `"command": "npx xxx"` → ✓ `"command": ["npx", "-y", "xxx"]` |
 | **URL format error** | URL missing protocol prefix | ❌ `"url": "example.com/mcp"` → ✓ `"url": "https://example.com/mcp"` |
 | **Browser can't auto-open** | Running in SSH/remote environment | OpenCode displays URL, manually copy to browser |
-| **Timeout too short** | `timeout` set to 1000ms | Remote servers recommend 2000+-10000ms, default 30000ms |
+| **Timeout too short** | `timeout` set to 1000ms | Use 2,000-10,000ms for remote servers; the default is 30,000ms |
 | **Forgot to enable server** | `enabled: false` but wondering why it doesn't work | Enabled by default, check if mistakenly set to `false` |
 
 ---
@@ -518,8 +558,10 @@ You learned:
 3. **Status Icons**: Meanings of ✓ ○ ⚠ ✗ four states
 4. **Permission Management**: Using `permission` to control tool access
 5. **Tool Auto-Discovery**: Tool naming rules and change notification mechanism
-6. **Rule Integration**: Configuring default MCP usage in AGENTS.md
-7. **Common MCPs**: Sentry, Context7, Grep, Postgres, etc.
+6. **Extended Context**: Server instructions, resources, and templates
+7. **Code Mode**: Orchestrating authorized MCP tools in a restricted environment
+8. **Rule Integration**: Configuring default MCP usage in AGENTS.md
+9. **Common MCPs**: Sentry, Context7, Grep, Postgres, etc.
 
 ---
 
@@ -535,4 +577,10 @@ You learned:
 
 ## Next Lesson Preview
 
-> In the next lesson, we'll learn about IDE integration, making OpenCode work seamlessly with editors like VS Code and JetBrains.
+> In the next lesson, we'll cover **[Chrome DevTools MCP](/en/5-advanced/07c-mcp-chrome-devtools)**.
+>
+> You'll learn how to:
+> - Connect AI directly to your Chrome browser
+> - Debug logged-in pages without signing in again
+> - Select an element or request in DevTools and have AI analyze it
+> - Take browser screenshots, execute scripts, and more

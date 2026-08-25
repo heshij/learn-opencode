@@ -48,6 +48,31 @@ http://<hostname>:<port>/doc
 
 例如：`http://localhost:4096/doc`
 
+本章下面的大部分 `/session`、`/file`、`/event` 路径属于 V1 API。`v1.18.22` 同时保留 V1，并通过 `/api/*` 扩展 V2；升级不会自动把现有 V1 调用改成 V2。
+
+> 来源：[`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20)、[`V1 sdk.gen.ts:431-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L431-L700)、[`V2 sdk.gen.ts:5426-5873`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5873)
+
+### V2 API 扩展
+
+V2 不只是模型目录。目标版本已经扩展到会话、问题、当前位置、事件流、历史分页、运行时操作和权限请求：
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| `GET` | `/api/location` | 解析当前 directory/workspace 位置 |
+| `GET` / `POST` | `/api/session` | 带分页的会话列表 / 创建会话 |
+| `GET` | `/api/session/:sessionID` | 获取会话 |
+| `GET` | `/api/session/:sessionID/history` | 按 `after` 和 `limit` 读取有限事件页 |
+| `GET` | `/api/session/:sessionID/event` | 回放后持续订阅该会话事件 |
+| `POST` | `/api/session/:sessionID/interrupt` | 中断当前进程拥有的活动执行 |
+| `GET` | `/api/session/:sessionID/question` | 列出 session 的待处理问题 |
+| `POST` | `/api/session/:sessionID/question/:requestID/reply` | 回答待处理问题 |
+| `POST` | `/api/session/:sessionID/question/:requestID/reject` | 拒绝待处理问题 |
+| `GET` / `POST` | `/api/session/:sessionID/permission` | 列出或创建 session 级权限请求 |
+| `GET` | `/api/permission/request` | 按位置列出待处理权限请求 |
+| `GET` | `/api/event` | V2 服务器事件 SSE |
+
+> 来源：[`sdk.gen.ts:5038-5058`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5038-L5058)、[`sdk.gen.ts:5171-5424`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5171-L5424)、[`sdk.gen.ts:5426-5793`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5793)、[`sdk.gen.ts:6319-6405`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L6319-L6405)、[`sdk.gen.ts:6549-6559`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L6549-L6559)
+
 ---
 
 ## 认证
@@ -88,10 +113,10 @@ curl -H "Authorization: Basic $(echo -n 'opencode:your-password' | base64)" \
 **示例**：
 
 ```bash
-# 检查服务器健康状态（无认证）
+# 未配置服务器密码时
 curl http://localhost:4096/global/health
 
-# 如果服务器设置了密码
+# 配置 OPENCODE_SERVER_PASSWORD 后，health 也需要 Basic Auth
 curl -u opencode:your-password http://localhost:4096/global/health
 ```
 
@@ -198,11 +223,15 @@ curl -u opencode:your-password http://localhost:4096/global/health
 | `DELETE` | `/session/:id/share` | 取消分享 | 返回 `Session` |
 | `GET` | `/session/:id/diff` | 获取会话的文件差异 | query: `messageID?` |
 | `POST` | `/session/:id/summarize` | 总结会话 | body: `{ providerID, modelID }` |
-| `POST` | `/session/:id/revert` | 还原消息 | body: `{ messageID, partID? }` |
-| `POST` | `/session/:id/unrevert` | 恢复所有已还原的消息 | 返回 `boolean` |
-| `POST` | `/session/:id/permissions/:permissionID` | 响应权限请求 | body: `{ response, remember? }` |
+| `POST` | `/session/:id/revert` | 撤销到指定消息/部件，并默认回滚关联文件补丁 | body: `{ messageID, partID? }` |
+| `POST` | `/session/:id/unrevert` | 重做已撤销的消息与文件状态 | 返回 `Session` |
+| `POST` | `/session/:id/permissions/:permissionID` | 响应权限请求 | body: `{ response }` |
 
 > 来源：`opencode/packages/web/src/content/docs/server.mdx:135-157`
+
+`revert` 不是只隐藏聊天消息：服务会定位目标边界、收集之后的 patch、恢复 snapshot 并更新会话 diff；`unrevert` 会恢复原 snapshot 并清除 revert 状态。两者都要求 session 不在运行中。配置 `snapshot: false` 只会禁用文件 snapshot 的 undo/redo，消息边界的撤销语义仍然存在。
+
+> 来源：[`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98)、[`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)、[`V1 sdk.gen.ts:678-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L678-L700)
 
 **示例 - 创建新会话**：
 
@@ -211,6 +240,26 @@ curl -X POST http://localhost:4096/session \
   -H "Content-Type: application/json" \
   -d '{"title": "代码审查会话"}'
 ```
+
+---
+
+## Workspace API（实验性）
+
+`v1.18.22` 的 workspace 是 adapter 驱动的：内置 adapter 为 `worktree`，API 支持列出 adapter、创建/发现 workspace、查看连接状态和 warp session。请求可通过 `directory` / `workspace` query 进行 workspace-aware 路由；`warp` 的 `copyChanges` 会复制 Git patch。
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| `GET` | `/experimental/workspace/adapter` | 列出当前项目可用 adapter |
+| `GET` / `POST` | `/experimental/workspace` | 列出 / 创建 workspace |
+| `POST` | `/experimental/workspace/sync-list` | 注册 adapter 发现但尚未登记的 workspace |
+| `GET` | `/experimental/workspace/status` | 获取连接状态 |
+| `POST` | `/experimental/workspace/warp` | 移动 session，可选 `copyChanges` |
+
+::: warning 历史边界
+v1.16.0 Release 的 managed workspace cloning 曾承诺保留脏文件和未跟踪文件；目标 tag 的当前路径已经是 adapter/worktree。该历史能力不能直接视为 `v1.18.22` 当前 API 的行为，`copyChanges` 的实现证据是 Git patch，不含“复制所有未跟踪文件”的承诺。
+:::
+
+> 当前实现：[`workspace API 路径:12-47`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/groups/workspace.ts#L12-L47)、[`workspace API 端点:53-127`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/groups/workspace.ts#L53-L127)、[`workspace.ts:492-538`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L492-L538)、[`workspace.ts:559-620`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L559-L620)、[`workspace-routing.ts:148-185`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts#L148-L185)。历史证据：[`v1.16.0 Release`](https://github.com/anomalyco/opencode/releases/tag/v1.16.0)、commit `5661af203487b90cf9ee0844b198b03cce26c412`。
 
 ---
 
@@ -232,11 +281,14 @@ curl -X POST http://localhost:4096/session \
 ```typescript
 {
   messageID?: string,     // 可选，消息 ID
-  model?: string,         // 可选，指定模型
+  model?: {               // 可选，指定模型
+    providerID: string,
+    modelID: string
+  },
   agent?: string,         // 可选，指定 agent
   noReply?: boolean,      // 可选，不等待回复
   system?: string,        // 可选，系统提示
-  tools?: string[],       // 可选，启用的工具
+  tools?: Record<string, boolean>, // 已废弃，优先使用 permission 配置
   parts: Part[]           // 消息内容
 }
 ```
@@ -476,7 +528,7 @@ data: {"sessionID":"abc123","content":"..."}
 完整的 TypeScript 类型定义可在 SDK 中查看：
 
 ```
-https://github.com/opencode-ai/opencode/blob/dev/packages/sdk/js/src/gen/types.gen.ts
+https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/types.gen.ts
 ```
 
 常用类型：

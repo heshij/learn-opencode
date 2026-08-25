@@ -1,13 +1,13 @@
 ---
 title: "5.2c Agent Permissions & Security"
 subtitle: "Precisely control what Agents can do"
-course: "OpenCode Chinese Practical Course"
+course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.2c"
 duration: "25 minutes"
 practice: "20 minutes"
 level: "Advanced"
-description: "Precisely control what Agents can and cannot do to ensure AI operation security."
+description: "Learn to secure OpenCode Agents with fine-grained bash, edit, task, and Skill permissions, least-privilege rules, and safe subagent boundaries."
 tags:
   - "Agent"
   - "Permissions"
@@ -43,7 +43,7 @@ Key concepts from this lesson:
 ### Three Permission Actions
 
 | Action | Description | Effect |
-|--------|-------------|--------|
+| --- | --- | --- |
 | `allow` | Allow | Execute directly, no confirmation needed |
 | `ask` | Ask | Show confirmation dialog, user decides |
 | `deny` | Deny | Refuse to execute, Agent receives error |
@@ -60,7 +60,7 @@ Agent-level permission
 
 **Later configurations override earlier ones.**
 
-> Source: `config.ts:418-447`, `agent.ts:194`
+> Source: `packages/core/src/v1/config/permission.ts` (schema definition) and `packages/opencode/src/agent/agent.ts:145` (`Permission.merge` call)
 
 ### Rule Priority: Last Match Wins
 
@@ -91,9 +91,9 @@ Executing `git push origin main`:
 ## Configurable Permission Types
 
 | Permission | Match Target | Description |
-|------------|--------------|-------------|
+| --- | --- | --- |
 | `read` | File path | Read files |
-| `edit` | File path | All file modifications (edit/write/patch/multiedit) |
+| `edit` | File path | All file modifications (edit/write/patch) |
 | `glob` | glob pattern | File search |
 | `grep` | Regex pattern | Content search |
 | `list` | Directory path | List directory contents |
@@ -101,15 +101,15 @@ Executing `git push origin main`:
 | `task` | subagent name | Call sub-agents |
 | `skill` | skill name | Load skills |
 | `lsp` | - | LSP queries (currently no fine-grained support) |
-| `todoread` | - | Read Todo list |
-| `todowrite` | - | Update Todo list |
+| `todowrite` | - | Read and write the todo list (gates the `todowrite` tool) |
 | `webfetch` | URL | Fetch web content |
 | `websearch` | Query string | Web search |
-| `codesearch` | Query string | Code search |
 | `external_directory` | - | Access paths outside project directory |
 | `doom_loop` | - | Detect repeated calls (same tool called 3 times with same input) |
+| `question` | - | Ask the user a question (defaults to deny to prevent subagents from interrupting the user) |
+| `plan_exit` | - | Exit Plan mode and switch to the build agent |
 
-> Source: `config.ts:418-447`
+> Source: `packages/core/src/v1/config/permission.ts:17-36`
 
 ---
 
@@ -153,7 +153,7 @@ Executing `git push origin main`:
 ### Wildcards
 
 | Symbol | Meaning | Example |
-|--------|---------|---------|
+| --- | --- | --- |
 | `*` | Match any characters (0 or more) | `git *` matches `git status`, `git log` |
 | `?` | Match single character | `file?.txt` matches `file1.txt` |
 
@@ -227,7 +227,6 @@ The edit permission controls **all file modification operations**, including:
 - `edit` tool
 - `write` tool
 - `patch` tool
-- `multiedit` tool
 
 ### Common Configuration
 
@@ -334,12 +333,13 @@ When `task: deny` is set:
 The complete parameter definition for the Task tool:
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `description` | string | Yes | Task description (3-5 words), used as sub-session title |
 | `prompt` | string | Yes | Task prompt for the sub-agent to execute |
 | `subagent_type` | string | Yes | Sub-agent name to call (must be non-primary agent) |
 | `task_id` | string | No | Resume a previous task; pass its returned `task_id` to reuse the same subagent session |
 | `command` | string | No | Command that triggered this task (for debugging) |
+| `background` | boolean | No | Run in the background; requires `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true` |
 
 ### Execution Flow
 
@@ -355,7 +355,7 @@ Main Agent (Build)
     2. Create Sub-session
        - Create independent session under main session
        - Title: description + (@subagent subagent)
-       - Apply restricted permissions (todowrite/todoread/task)
+       - Use the subagent's own permissions while inheriting the parent session's deny and external_directory rules
        ↓
     3. Call Sub-agent
        - Sub-agent executes in independent session
@@ -370,15 +370,23 @@ Main Agent (Build)
 
 > **Key Point**: Sub-agents run in **independent Sessions** and cannot see the Main Agent's conversation history. You must provide complete context when calling.
 
-### Default Restrictions for Sub-agents
+### Background Execution and Nesting Depth
 
-To prevent infinite recursion, sub-agents (whether called via task or `@` manually) have the following **hardcoded restrictions**:
+Background subagents remain experimental. Once enabled, the Task tool accepts `background: true`. The TUI can also move a synchronous subagent from the currently blocked session into the background. When it finishes, the result is automatically reported to the parent session—do not poll for progress.
 
-| Restriction | Description | Reason |
-|-------------|-------------|--------|
-| `todowrite: deny` | Deny writing to todo list | Prevent sub-agent from interfering with Main Agent task management |
-| `todoread: deny` | Deny reading todo list | Same as above |
-| `task: deny` | Deny calling other sub-agents | Prevent infinite recursion |
+```bash
+export OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true
+```
+
+The top-level `subagent_depth` setting controls subagent nesting depth. Its default is `1`, which means a subagent cannot create another subagent by default. To allow nesting, raise this value and explicitly configure `task` in the relevant subagent's own permissions:
+
+```jsonc
+{
+  "subagent_depth": 2
+}
+```
+
+> Source: [`runtime-flags.ts:43`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/effect/runtime-flags.ts#L43), [`task.ts:43-61`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L43-L61), [`task.ts:96-117`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L96-L117), and [`config.ts:84-86`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L84-L86)
 
 ### Practical Usage Examples
 
@@ -431,7 +439,7 @@ TaskTool(
 )
 ```
 
-> **Source**: `packages/opencode/src/tool/task.ts:43-172`
+> **Source**: [`packages/opencode/src/tool/task.ts:43-172`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L43-L172)
 
 ---
 
@@ -475,15 +483,15 @@ OpenCode has some default security rules configured:
   "permission": {
     "read": {
       "*": "allow",
-      "*.env": "deny",          // .env files denied
-      "*.env.*": "deny",        // .env.xxx also denied
+      "*.env": "ask",           // .env files require confirmation (for security)
+      "*.env.*": "ask",         // .env.xxx files also require confirmation
       "*.env.example": "allow"  // Example files allowed
     }
   }
 }
 ```
 
-> Source: `agent.ts:51-56`
+> Source: `agent.ts:130-135`
 
 ### doom_loop Detection
 
@@ -497,6 +505,31 @@ When the same tool is called 3 times consecutively with identical input, doom_lo
 }
 ```
 
+### question Permission
+
+Controls whether an Agent can use the question tool to ask the user a question.
+
+| Default | Description |
+| --- | --- |
+| subagent: `deny` | Prevents subagents from interrupting the user unnecessarily |
+| build agent: `allow` | Allows the primary Agent to ask questions |
+
+**Use case**: Set this permission to `allow` when a subagent needs to confirm uncertainties with you.
+
+```jsonc
+{
+  "agent": {
+    "interactive-helper": {
+      "permission": {
+        "question": "allow"    // Allow this subagent to ask questions
+      }
+    }
+  }
+}
+```
+
+> Source: `agent.ts:126` and `question.ts`
+
 ### external_directory Protection
 
 When an Agent attempts to access paths outside the project directory:
@@ -509,26 +542,83 @@ When an Agent attempts to access paths outside the project directory:
 }
 ```
 
-### Implicit Restrictions for Sub-agents
+### plan_enter / plan_exit Permissions
 
-Besides configured permissions, sub-agents (whether subagent mode or called all mode) have the following **hardcoded restrictions**:
+Control whether an Agent can switch Plan mode:
 
-1. **Todo Tools Disabled**
-   - Sub-agents **can never use** `todowrite` and `todoread`.
-   - This prevents sub-agents from interfering with Main Agent's task list management.
+- **`plan_enter`**: Enter Plan mode. It remains available as a permission key, but there is no corresponding tool implementation in the source; the user enters it by pressing Tab to switch to the plan agent.
+- **`plan_exit`**: Exit Plan mode and switch to the build agent. This action is implemented by `PlanExitTool`.
 
-2. **Primary Agent Exclusive Tools Disabled**
-   - Tools configured in `primary_tools` cannot be used by sub-agents.
+The target version does not implement a `plan_enter` tool, so retaining a permission key with that name does not let the Build Agent switch on its own. The Plan Agent uses `plan_exit` to request a return to Build, and the request is evaluated by the normal permission rules.
 
-3. **Task Nesting Restriction**
-   - Sub-agents **cannot** call other sub-agents by default (unless explicitly granted `task` permission).
-   - Example: `explore` cannot call `general` because its default permission is `*: deny`.
+```jsonc
+{
+  "agent": {
+    "plan": {
+      "permission": {
+        "plan_exit": "allow"      // Allow the Plan Agent to request a return to Build
+      }
+    }
+  }
+}
+```
 
-   **Why this design?**
-   - **Prevent infinite recursion**: Avoid circular call chains between sub-agents that never complete
-   - **Control complexity**: Make task execution paths more predictable and easier to debug
-   - **Resource management**: Each sub-agent call creates a new session, consuming tokens and compute
-   - **Separation of concerns**: Sub-agents should focus on one thing, orchestration is for the main agent
+> Source: [`plan.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/plan.ts#L13-L79) and [`registry.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L215-L248)
+
+### Deprecated Field: tools
+
+⚠️ The **`tools` field is deprecated**. Use `permission` instead.
+
+**Old syntax (deprecated)**:
+
+```jsonc
+{
+  "agent": {
+    "my-agent": {
+      "tools": {
+        "bash": false,      // Disable bash
+        "edit": true        // Allow editing
+      }
+    }
+  }
+}
+```
+
+**New syntax**:
+
+```jsonc
+{
+  "agent": {
+    "my-agent": {
+      "permission": {
+        "bash": "deny",     // Disable bash
+        "edit": "allow"     // Allow editing
+      }
+    }
+  }
+}
+```
+
+**Migration notes**:
+- `write`, `edit`, and `patch` in `tools` map to the `edit` permission.
+- Other legacy tool names may be converted into permission keys with the same name, but they do not create callable capabilities when the target version has no corresponding tool.
+- `true` becomes `"allow"`; `false` becomes `"deny"`.
+- OpenCode converts old configurations automatically, but you should update them manually.
+
+> Source: `packages/core/src/v1/config/agent.ts:71-76`
+
+### Subagent Permission Inheritance
+
+When the Task tool creates a child session, its capabilities start with the **subagent's own permissions**; it does not inherit the parent Agent's `allow` or `ask` rules. To prevent the subagent from bypassing the parent session's security boundary, it does inherit every `deny` rule and every `external_directory` rule from the parent session.
+
+Two additional denials are applied by default:
+
+- If the subagent's own rules do not configure `todowrite`, OpenCode appends `todowrite: deny`.
+- If the subagent's own rules do not configure `task`, OpenCode appends `task: deny`.
+
+These are defaults, not hardcoded restrictions that can never be overridden. Explicitly configuring the corresponding permissions still requires the call to satisfy `subagent_depth`. Tools listed in `experimental.primary_tools` continue to receive an appended deny rule in Task child sessions.
+
+> Source: [`subagent-permissions.ts:4-26`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/agent/subagent-permissions.ts#L4-L26) and [`task.ts:139-170`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/task.ts#L139-L170)
 
 ---
 
@@ -570,15 +660,15 @@ Permissions set in Agent configuration **override** global permissions.
 
 ```markdown
 ---
-description: Read-only audit Agent
-mode: subagent
+description: "Read-only audit Agent"
+mode: "subagent"
 permission:
-  edit: deny
+  edit: "deny"
   bash:
-    "*": deny
-    "git log*": allow
-    "git diff*": allow
-  webfetch: deny
+    "*": "deny"
+    "git log*": "allow"
+    "git diff*": "allow"
+  webfetch: "deny"
 ---
 
 Only analyzes code, makes no modifications.
@@ -670,11 +760,11 @@ Checklist:
 ## Common Pitfalls
 
 | Symptom | Cause | Solution |
-|---------|-------|----------|
+| --- | --- | --- |
 | Permission not working | Wrong rule order | Put `*` first, specific rules after |
 | Subagent still callable | User @ calls are unrestricted | task permission only affects Task tool |
 | bash command match fails | Matches parsed command | Check actual command format (with arguments) |
-| .env still readable | Custom rule overrode default | Remember to keep .env deny rule |
+| .env can be read without confirmation | A custom rule overrode the default | Set .env to ask if you need to protect it |
 | Permissions too strict | Set `*: deny` forgot to allow necessary ones | Add allow rules one by one |
 
 ---
@@ -692,10 +782,10 @@ For global permission configuration and more details, see [5.5 Permission Contro
 You learned:
 
 1. **Permission System Architecture**: Three actions, configuration hierarchy, last match wins
-2. **12+ Permission Types**: bash, edit, task, skill, etc.
+2. **Common Permission Types**: bash, edit, task, skill, question, plan_exit, and more
 3. **Fine-grained Control**: Using object syntax and wildcards
 4. **TaskTool Mechanism**: Sub-agent calls, parameter definition, execution flow
-5. **Sub-agent Restrictions**: todowrite/todoread/task disabled to prevent infinite recursion
+5. **Subagent Boundaries**: Uses its own permissions, inherits the parent session's deny / external_directory rules, and is limited by the default nesting depth
 6. **Built-in Security Rules**: .env protection, doom_loop, external_directory
 7. **Security Best Practices**: Least privilege, explicit allow, sensitive operations ask
 

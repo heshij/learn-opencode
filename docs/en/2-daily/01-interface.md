@@ -1,5 +1,5 @@
 ---
-title: "Interface & Basic Operations"
+title: "OpenCode Interface and Basic Operations | OpenCode Tutorial"
 subtitle: "Master OpenCode's core operations"
 course: "OpenCode Practical Course"
 stage: "Stage 2"
@@ -59,7 +59,7 @@ Key knowledge points from this lesson:
 
 > Make sure you've completed the following:
 
-- [ ] Completed [1.4 Connect Model](../1-start/04-connect)
+- [ ] Completed [1.4 Connect Model](/en/1-start/04-connect)
 - [ ] OpenCode can have normal conversations with AI
 
 ---
@@ -85,35 +85,29 @@ After starting OpenCode, you'll see an interface like this:
 ```
 
 | Area | Purpose |
-|------|---------|
+| --- | --- |
 | Status Bar/Header | Shows version, current mode (Plan/Build), Token usage |
 | Sidebar | Session list (auto-shows on wide screens, hides on narrow) |
 | Chat Area | AI responses and your message history |
 | Input Area | Where you type messages (different modes have different prompts) |
 
-::: details 🆕 v1.1.57~v1.1.60 New Features
+::: details Interface Display Rules
 
-**1. Sidebar Auto Show/Hide (v1.1.57)**
+**1. Sidebar Auto Show/Hide**
 - Auto-shows session list on wide screens (>120 columns)
 - Auto-hides on narrow screens to save space
-- Can be toggled manually via `session.toggle.sidebar` command
 
-**2. Input Box Smart Prompts (v1.1.58)**
+**2. Input Box Smart Prompts**
 - Different modes show different placeholder prompts
 - Normal mode: `Ask something...`
 - Shell mode: `Enter shell command...`
 - Comment summary mode: `Summarize comments...`
-
-**3. Hide Session Header (v1.1.60)**
-- Can hide the top status bar via command palette
-- Useful when you need more chat space
-- Search `session.toggle.header` to toggle
 :::
 
 ### Core Operations Trio
 
 | Symbol | Purpose | Example |
-|--------|---------|---------|
+| --- | --- | --- |
 | `@` | Reference file | `@src/main.ts What does this file do` |
 | `!` | Execute command | `!ls -la` to view directory |
 | `/` | Slash command | `/help` to view help |
@@ -201,17 +195,15 @@ Type:
 Common slash commands overview:
 
 | Command | Purpose |
-|---------|---------|
+| --- | --- |
 | `/help` | View help |
 | `/new` | New session |
 | `/models` | Switch model |
-| `/theme` | Switch theme |
+| `/themes` | Switch theme |
 | `/exit` | Exit |
 
-::: tip 💡 Interface Customization Commands
-Search in the command palette (<kbd>Ctrl</kbd>+<kbd>X</kbd>):
-- `session.toggle.sidebar` - Toggle sidebar display
-- `session.toggle.header` - Toggle header display
+::: tip 💡 Command Palette
+Press <kbd>Ctrl</kbd>+<kbd>P</kbd> to open the command palette. <kbd>Ctrl</kbd>+<kbd>X</kbd> is the Leader prefix and does not open the palette by itself.
 :::
 
 ### Step 6: Learn Common Shortcuts
@@ -220,13 +212,25 @@ Search in the command palette (<kbd>Ctrl</kbd>+<kbd>X</kbd>):
 Shortcuts make you faster.
 
 | Shortcut | Purpose |
-|----------|---------|
+| --- | --- |
 | <kbd>Tab</kbd> | Toggle Plan/Build mode |
-| <kbd>Ctrl</kbd>+<kbd>C</kbd> | Interrupt current operation |
-| <kbd>Ctrl</kbd>+<kbd>L</kbd> | Clear screen |
+| <kbd>Esc</kbd> | Interrupt the current response or go back one level |
+| <kbd>Ctrl</kbd>+<kbd>C</kbd> | Clear the input; can also exit the application |
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> | Leader key (prefix key) |
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>N</kbd> | New session |
-| <kbd>Esc</kbd> | Cancel/Go back |
+
+### Step 7: Review Changes in the Diff Viewer
+
+Enter `/diff`—or search for `Open diff viewer` in the command palette—to open the diff viewer, which is enabled by default. It organizes changes in a file tree and supports:
+
+- Navigating by file and hunk
+- Switching between a single patch and all patches
+- Switching between unified and split views (narrow terminals display only the unified view)
+- Viewing workspace changes and changes produced by the latest AI turn; when the current branch is not the default branch, you can also view its differences from the main branch
+
+Common keys: <kbd>]</kbd> / <kbd>[</kbd> to move between hunks, <kbd>n</kbd> / <kbd>p</kbd> to move between files, <kbd>d</kbd> to switch sources, <kbd>v</kbd> to switch views, <kbd>m</kbd> to mark a file as reviewed, <kbd>?</kbd> to open the full help, and <kbd>Esc</kbd> / <kbd>q</kbd> to close the viewer and return to the previous screen.
+
+> Source references: [v1.18.22 diff viewer navigation and sources](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L563-L704) and [entry command](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L1045-L1071).
 
 ::: details 📦 What is a Leader Key
 A Leader key is a shortcut combination method. First press <kbd>Ctrl</kbd>+<kbd>X</kbd>, release, then press another key.
@@ -246,13 +250,14 @@ This allows more shortcut combinations without conflicting with system shortcuts
 - [ ] Can execute system commands with `!command`
 - [ ] Can see help information with `/help`
 - [ ] <kbd>Tab</kbd> key can toggle Plan/Build mode
+- [ ] `/diff` opens the diff viewer and lets you switch files or hunks
 
 ---
 
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|-------|-------|----------|
+| --- | --- | --- |
 | No file completion after `@` | Not in project directory | `cd` to project directory and restart |
 | `!` command permission error | OpenCode blocked dangerous command | Confirm command is safe then press `y` to allow |
 | Shortcuts not working | Terminal hijacked the keys | Check terminal settings or try another terminal |

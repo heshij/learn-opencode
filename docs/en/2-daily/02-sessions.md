@@ -1,5 +1,5 @@
 ---
-title: "Managing Sessions"
+title: "OpenCode Session Management and Recovery | OpenCode Tutorial"
 subtitle: "Efficiently manage your conversations"
 course: "OpenCode Practical Course"
 stage: "Stage 2"
@@ -7,7 +7,7 @@ lesson: "2.2"
 duration: "15 minutes"
 practice: "20 minutes"
 level: "Beginner"
-description: "Use /new to create sessions, /sessions to switch, /undo to revert, /export to export. Also learn CLI backup/restore and session forking."
+description: "Learn OpenCode session management: create and switch sessions, undo changes, export Markdown or JSON, import backups and share links, and fork conversations."
 tags:
   - "Session"
   - "Undo"
@@ -80,23 +80,14 @@ Key takeaways from this lesson:
 
 ### Where Are Sessions Stored?
 
-OpenCode stores session data in the local file system, organized as JSON files:
+OpenCode stores sessions, messages, and message parts in SQLite. By default, the database is named `opencode.db` in OpenCode's data directory:
 
 ```
-~/.local/share/opencode/storage/
-├── session/           # Session info
-│   └── <project-id>/
-│       └── <session-id>.json
-├── message/           # Message records
-│   └── <session-id>/
-│       └── <message-id>.json
-└── part/              # Message parts (text, tool calls, etc.)
-    └── <message-id>/
-        └── <part-id>.json
+~/.local/share/opencode/opencode.db
 ```
 
 ::: details Path Explanation
-`~/.local/share/opencode/` is the XDG standard data directory. Both macOS and Linux follow this convention. Sessions are isolated by project, so different projects don't interfere with each other.
+This example uses the Linux XDG data directory. The actual location depends on your operating system and environment. Sessions in the database remain associated with their respective projects; do not edit the database manually.
 :::
 
 ### Lifecycle of a Session
@@ -112,7 +103,7 @@ Most of the time you don't need to worry about this—OpenCode handles it automa
 ### Session Management Commands Overview
 
 | Command | Purpose |
-|--------|---------|
+| --- | --- |
 | `/new` | Create new session |
 | `/sessions` | View and switch sessions |
 | `/undo` | Undo last operation |
@@ -177,7 +168,7 @@ AI might make mistakes—undo helps you recover.
 `/undo` to revert **file operations** (create, modify, delete files) requires the project to be a **Git repository**.
 
 | Project Type | Undo File Operations | Undo Conversation Record |
-|-------------|---------------------|-------------------------|
+| --- | --- | --- |
 | Git project | ✅ Files will be restored | ✅ |
 | Non-Git project | ❌ Files won't change | ✅ |
 
@@ -288,15 +279,18 @@ Fork copies all history messages from the current session and creates a new sess
 
 **How to Use**:
 
-Fork has no default shortcut. You can bind one in `opencode.json`:
+Fork has no default shortcut. You can bind one in your project's `tui.json` or `tui.jsonc`:
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "session_fork": "<leader>f"
   }
 }
 ```
+
+Keybindings belong in the separate TUI configuration, not in the main `opencode.json` / `opencode.jsonc`. See the v1.18.22 [TUI keybinding schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) for the source definition.
 
 After configuration, press <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>f</kbd> to fork the current session.
 
@@ -320,7 +314,7 @@ After configuration, press <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>f</kbd> to fork the
 ## Common Pitfalls
 
 | Issue | Cause | Solution |
-|------|-------|----------|
+| --- | --- | --- |
 | `/undo` didn't restore files | Current directory is not a Git repo | Switch to a Git project, or run `git init` first |
 | `/undo` reverted conversation but file still exists | Non-Git projects don't support file undo | This is expected behavior—only conversation record is undone |
 | Too many sessions, can't find one | Session names are all defaults | Develop habit of using `/new task-name` to name sessions |

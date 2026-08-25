@@ -64,6 +64,26 @@ prerequisite:
 
 ---
 
+## 自动批准模式的边界
+
+标准 TUI 和非交互 `run` 都公开提供 `--auto`：
+
+```bash
+# 标准 TUI
+opencode --auto
+
+# 非交互任务
+opencode run --auto "运行测试并修复失败项"
+```
+
+它只会自动批准原本会进入 `ask` 流程的权限请求，**不会覆盖显式 `deny` 规则**。例如配置了 `"rm *": "deny"` 后，即使使用 `--auto`，匹配的删除命令仍会被拒绝。
+
+目标版本还接受隐藏的 `--yolo` 作为兼容别名，并将它与 `--auto` 映射到同一自动批准行为；新命令和脚本应使用公开参数 `--auto`。这个开关适用于标准 TUI 与 `opencode run`，`opencode --mini` 入口不会转发它。
+
+> **源码（v1.18.22）**：[`tui.ts:108-121`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L108-L121)、[`tui.ts:287-295`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L287-L295)、[`run.ts:242-274`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L242-L274)
+
+---
+
 ## 全局权限配置
 
 在 `opencode.json` 中使用 `permission`（注意是**单数**）：
@@ -135,7 +155,7 @@ prerequisite:
 | 权限 | 描述 | 匹配内容 |
 |------|------|---------|
 | `read` | 读取文件 | 文件路径 |
-| `edit` | 文件修改权限（涵盖 edit, write, patch, multiedit） | 文件路径 |
+| `edit` | 文件修改权限（涵盖 edit、write 和 patch） | 文件路径 |
 | `glob` | 文件通配符搜索 | glob 模式 |
 | `grep` | 内容搜索 | 正则表达式模式 |
 | `list` | 列出目录文件 | 目录路径 |
@@ -145,7 +165,7 @@ prerequisite:
 | `lsp` | 运行 LSP 查询 | 支持细粒度匹配 |
 | `external_directory` | 访问项目外路径 | 目录路径 |
 
-> 📝 注：`edit` 权限涵盖 write（创建新文件）、edit（修改文件）、patch（修补文件）、multiedit（批量编辑）四种工具操作。
+> 📝 注：目标版本没有 `multiedit` 工具；文件创建、编辑和补丁操作统一受 `edit` 权限控制。
 
 ### 仅支持简单语法的权限
 
@@ -153,14 +173,12 @@ prerequisite:
 
 | 权限 | 描述 |
 |------|------|
-| `todoread` | 读取待办列表 |
 | `todowrite` | 更新待办列表 |
 | `webfetch` | 获取 URL 内容（运行时会传递 URL 用于 always 批准） |
 | `websearch` | 网页搜索（运行时会传递查询用于 always 批准） |
-| `codesearch` | 代码搜索（运行时会传递查询用于 always 批准） |
 | `doom_loop` | 相同工具调用重复 3 次时触发 |
 
-> ⚠️ 注意：`plan_enter`、`plan_exit` 仅作为内置 Agent 的默认权限配置使用，用户在 opencode.json 中配置无效。`question` 字段用户可以配置，但一般不需要修改。
+> ⚠️ 注意：目标版本没有 `plan_enter` 工具实现；配置同名权限键不会产生可调用动作。实验性 `plan_exit` 工具存在，出现时会按正常权限规则求值，用户规则可以覆盖内置默认值。
 
 > **来源**：`opencode/packages/opencode/src/config/config.ts:621-652`
 
@@ -177,8 +195,8 @@ prerequisite:
   "permission": {
     "read": {
       "*": "allow",
-      "*.env": "deny",
-      "*.env.*": "deny",
+      "*.env": "ask",
+      "*.env.*": "ask",
       "*.env.example": "allow"  // 示例文件允许读取
     }
   }
@@ -196,21 +214,21 @@ OpenCode 内置四种主要 Agent，每种有不同的默认权限：
 | 工具/权限 | build | plan | general | explore |
 |----------|-------|------|---------|---------|
 | 文件读取 | ✅ | ✅ | ✅ | ✅ |
-| 文件编辑 | ✅ | ❌（仅 `.opencode/plans/*.md` 允许） | ✅ | ❌ |
+| 文件编辑 | ✅ | ❌（仅项目或全局计划文件允许） | ✅ | ❌ |
 | Shell 命令 | ✅ | ✅ | ✅ | ✅ |
 | 网页搜索/获取 | ✅ | ✅ | ✅ | ✅ |
 | 代码搜索 | ✅ | ✅ | ✅ | ✅ |
 | TODO 管理 | ✅ | ✅ | ❌ | ❌ |
-| 提问工具 | ✅ | ✅ | ✅ | ❌ |
-| 计划进入/退出 | ✅ | ✅ | ❌ | ❌ |
-| 外部目录访问 | ⚠️（默认 ask） | ⚠️（ask，仅 .opencode/plans/* 允许） | ⚠️（默认 ask） | ⚠️（ask，仅 GLOB 允许） |
+| 提问工具 | ✅ | ✅ | ❌ | ❌ |
+| `plan_exit` | ❌ | ✅ | ❌ | ❌ |
+| 外部目录访问 | ⚠️（默认 ask） | ⚠️（默认 ask；另允许全局 plans 目录） | ⚠️（默认 ask） | ⚠️（默认 ask；继承通用白名单） |
 
 ::: details 📝 注：外部目录权限说明
-所有 Agent 访问外部目录默认都需要用户确认（ask），但部分 Agent 有例外：
+所有 Agent 访问外部目录默认都需要用户确认（ask），并继承临时截断目录、临时目录、Skill 与 Reference 目录等通用白名单。部分 Agent 还有例外：
 - **build**：默认 ask
-- **plan**：默认 ask，但允许访问 `.opencode/plans/*` 目录
+- **plan**：默认 ask，另允许访问全局数据目录中的 `plans/*`；项目 `.opencode/plans/*.md` 属于 edit 白名单，不是外部目录例外
 - **general**：默认 ask
-- **explore**：默认 ask，但允许 GLOB 路径访问
+- **explore**：默认 ask，继承截断输出、临时目录、Skill 与 Reference 目录等通用白名单
 :::
 
 ::: details 📝 注：各 Agent 详细说明
@@ -222,17 +240,17 @@ OpenCode 内置四种主要 Agent，每种有不同的默认权限：
 
 ### Plan Agent
 - **模式**：`primary`
-- **权限**：edit 默认禁止，仅允许编辑 `.opencode/plans/*.md` 计划文件
+- **权限**：edit 默认禁止，仅允许编辑项目或全局计划文件
 - **用途**：只读规划，不修改代码，确保分析阶段专注思考
 
 ### General Agent
 - **模式**：`subagent`
-- **权限**：禁止 TODO 工具（todoread/todowrite: deny）
+- **权限**：默认禁止 `todowrite` 和 `question`
 - **用途**：通用研究，多步任务
 
 ### Explore Agent
 - **模式**：`subagent`
-- **权限**：默认禁止所有工具（`"*": "deny"`），仅允许 grep/glob/list/bash/read/webfetch/websearch/codesearch
+- **权限**：默认禁止所有工具（`"*": "deny"`），只放行用于探索的读取、搜索和 shell 能力
 - **用途**：快速代码探索
 
 :::
@@ -275,7 +293,7 @@ export function contains(parent: string, child: string) {
 ```jsonc
 {
   "permission": {
-    "external_directory": "ask"  // 默认值：对非 GLOB 路径每次询问用户确认
+    "external_directory": "ask"  // 默认值：对白名单之外的外部路径询问用户确认
   }
 }
 ```
@@ -612,8 +630,8 @@ OpenCode 默认保护所有 `.env` 和 `.env.*` 文件，但允许直接访问 `
 1. 三种权限模式（allow/ask/deny）
 2. 使用 `permission` 配置（单数）
 3. 区分支持对象语法和简单语法的权限
-4. **完整的权限字段列表**（read, edit, glob, grep, list, bash, task, skill, lsp, external_directory, todowrite, todoread, webfetch, websearch, codesearch, doom_loop, question）
-   - 注：`write`、`patch`、`multiedit` 工具使用 `edit` 权限
+4. **常用权限字段列表**（read, edit, glob, grep, list, bash, task, skill, lsp, external_directory, todowrite, webfetch, websearch, doom_loop, question）
+   - 注：`write` 和 `patch` 操作使用 `edit` 权限
 5. **四种内置 Agent 的权限矩阵**（build/plan/general/explore）
 6. Bash 命令的 Arity 解析机制
 7. `always` 的模式匹配行为

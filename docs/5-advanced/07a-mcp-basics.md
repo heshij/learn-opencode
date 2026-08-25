@@ -154,11 +154,36 @@ opencode x @modelcontextprotocol/server-filesystem /path/to/allowed/dir
 |------|------|------|------|
 | `type` | String | ✓ | 必须是 `"local"` |
 | `command` | Array | ✓ | 命令数组，如 `["npx", "-y", "xxx"]` 或 `["bun", "x", "xxx"]` |
+| `cwd` | String | | MCP 进程的工作目录；相对路径从当前 workspace 目录解析 |
 | `environment` | Object | | 环境变量键值对 |
 | `enabled` | Boolean | | 是否启用，默认 `true` |
 | `timeout` | Number | | 连接超时（毫秒），默认 30000 |
 
 > ⚠️ **注意**：官方文档描述 timeout 默认值为 2000+ms，但源码实际默认值为 30000ms（30秒）。来源：`mcp/index.ts:29`
+
+未设置 `cwd` 时，本地 MCP 进程直接使用当前 workspace 目录。设置相对路径时，OpenCode 会以 workspace 目录为基准解析；绝对路径则直接使用。
+
+```jsonc
+{
+  "mcp": {
+    "project-tools": {
+      "type": "local",
+      "command": ["npx", "-y", "my-project-mcp"],
+      "cwd": "tools/mcp"
+    }
+  }
+}
+```
+
+源码：[MCP 本地配置的 `cwd` 定义](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/mcp.ts#L6-L23)、[workspace-relative 解析](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L340-L357)。
+
+### Roots 与能力协商
+
+连接 MCP 服务器时，OpenCode 会声明 `roots` 客户端能力；服务器请求 roots 时，OpenCode 返回当前 workspace 目录对应的 `file://` URI。它不是额外的可编辑配置，也不会自动暴露任意目录。
+
+服务器能提供哪些内容则由它声明的 capabilities 决定。例如，只有声明 `tools` 才会发现工具，声明 `resources` 后才会出现资源相关能力。不要把“连接成功”等同于服务器支持所有 MCP 能力。
+
+源码：[客户端 capabilities](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L38-L50)、[roots 响应](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L75-L80)。
 
 ### 使用方式
 

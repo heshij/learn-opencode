@@ -3,11 +3,6 @@ title: 快捷键速查表
 description: OpenCode 所有快捷键的完整参考
 ---
 
----
-title: 快捷键速查表
-description: OpenCode 所有快捷键的完整参考
----
-
 # 快捷键速查表
 
 > 打印这页贴在显示器旁边，三天就能肌肉记忆
@@ -57,7 +52,7 @@ OpenCode 使用 **Leader 键** 避免与终端快捷键冲突。
 | `Leader` → `l` | 会话列表 | 等同于 /sessions |
 | `Leader` → `m` | 模型列表 | 等同于 /models |
 | `Leader` → `a` | Agent 列表 | 选择 Agent |
-| `Leader` → `t` | 主题列表 | 等同于 /theme |
+| `Leader` → `t` | 主题列表 | 等同于 /themes |
 | `Leader` → `e` | 编辑器 | 打开外部编辑器 |
 | `Leader` → `c` | 压缩 | 压缩当前会话上下文 |
 | `Leader` → `u` | 撤销 | 撤销上一次修改 |
@@ -69,14 +64,32 @@ OpenCode 使用 **Leader 键** 避免与终端快捷键冲突。
 | `Leader` → `y` | 复制 | 复制消息 |
 | `Leader` → `h` | 隐藏详情 | 切换详情显示 |
 | `Leader` → `q` | 退出 | 关闭 OpenCode |
+| `Ctrl+B` | 后台运行 | 将同步运行的子 Agent 转入后台 |
+
+### Diff viewer
+
+输入 `/diff` 或从命令面板打开 diff viewer；`diff_open` 默认未绑定按键，也可以自行配置。viewer 默认启用，支持文件树、文件/hunk 导航、单个或全部 patch、统一/分栏视图，以及工作区和最后一轮 AI 改动；当前分支不是默认分支时，还可选择主分支对比。
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Esc` / `q` | 关闭并返回上一屏 |
+| `Tab` | 切换文件树与 patch 区焦点 |
+| `]` / `[` | 下一个/上一个 hunk |
+| `n` / `p` | 下一个/上一个文件 |
+| `b` | 显示/隐藏文件树 |
+| `s` | 切换单个/全部 patch |
+| `d` | 切换 diff 来源 |
+| `v` | 切换分栏/统一视图 |
+| `m` | 标记或取消标记文件为已审阅 |
+| `?` | 显示完整帮助 |
 
 ### 会话导航
 
 | 快捷键 | 功能 | 说明 |
 |--------|------|------|
-| `Leader` → `→` | 子会话 | 切换到子 Agent 会话 |
-| `Leader` → `←` | 反向子会话 | 反向切换子会话 |
-| `Leader` → `↑` | 父会话 | 返回父会话 |
+| `→` | 子会话 | 切换到子 Agent 会话 |
+| `←` | 反向子会话 | 反向切换子会话 |
+| `↑` | 父会话 | 返回父会话 |
 
 ### 消息滚动
 
@@ -162,11 +175,11 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 
 ## 自定义快捷键
 
-在 `opencode.json` 中配置：
+在独立的 `tui.json` 或 `tui.jsonc` 中配置扁平的 `keybinds` 映射：
 
 ```json
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "leader": "ctrl+x",
     "session_new": "<leader>n",
@@ -178,12 +191,12 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 
 ### 禁用快捷键
 
-设置为 `"none"` 禁用：
+设置为 `"none"` 或 `false` 禁用：
 
 ```json
 {
   "keybinds": {
-    "session_compact": "none"
+    "session_compact": false
   }
 }
 ```
@@ -202,9 +215,21 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 
 ---
 
-## 所有可配置的键绑定
+### 配置位置与迁移
 
-> 来源：[keybinds.mdx](https://github.com/anomalyco/opencode/blob/dev/packages/web/src/content/docs/keybinds.mdx)
+加载顺序为：全局配置目录、`OPENCODE_TUI_CONFIG`、普通项目 `tui.json` / `tui.jsonc`、沿途 `.opencode`、`OPENCODE_CONFIG_DIR`，后者优先。普通项目文件按根侧到当前目录应用，越近当前目录越优先；多个 `.opencode` 目录按当前侧到根侧合并，冲突时更靠根侧者后加载并取胜。`OPENCODE_CONFIG_DIR` 最后加载。
+
+升级时，启动 TUI 会检查全局、项目沿途、配置目录和 `OPENCODE_CONFIG` 指定的旧主配置，把其中的 `theme`、`keybinds` 和 `tui` 字段迁到同目录的 `tui.json`。目标 `tui.json` 已存在时跳过；只有 `tui.jsonc` 不会阻止迁移。成功写入并创建或复用 `.tui-migration.bak` 后，才从原配置删除旧字段。主配置已不再读取这些字段。
+
+### 光标外观
+
+`cursor` 与 `keybinds` 同级；`style` 支持 `block`、`underline`、`line`、`default`，`blinking` 控制闪烁。`default` 会保留终端设置并忽略 `blinking`。
+
+## 常用可配置键绑定
+
+> 来源：[v1.18.22 `keybind.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L45-L75)
+>
+> 新增项：[后台会话](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L86-L98)、[Skill](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L153-L159)、[cursor](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L33-L40)
 
 ### 基础键绑定
 
@@ -212,6 +237,7 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 |------|--------|------|
 | `leader` | `ctrl+x` | Leader 键 |
 | `app_exit` | `ctrl+c,ctrl+d,<leader>q` | 退出 |
+| `diff_open` | `none` | 打开 diff viewer |
 
 ### 会话管理
 
@@ -221,11 +247,12 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 | `session_list` | `<leader>l` | 会话列表 |
 | `session_export` | `<leader>x` | 导出会话 |
 | `session_interrupt` | `escape` | 中断响应 |
+| `session_background` | `ctrl+b` | 将同步子 Agent 转入后台 |
 | `session_compact` | `<leader>c` | 压缩上下文 |
 | `session_timeline` | `<leader>g` | 时间线 |
-| `session_child_cycle` | `<leader>right` | 切换子会话 |
-| `session_child_cycle_reverse` | `<leader>left` | 反向切换子会话 |
-| `session_parent` | `<leader>up` | 返回父会话 |
+| `session_child_cycle` | `right` | 切换子会话 |
+| `session_child_cycle_reverse` | `left` | 反向切换子会话 |
+| `session_parent` | `up` | 返回父会话 |
 | `session_fork` | `none` | 分叉会话 |
 | `session_rename` | `ctrl+r` | 重命名会话 |
 | `session_delete` | `ctrl+d` | 删除会话 |
@@ -245,6 +272,26 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 | `agent_list` | `<leader>a` | Agent 列表 |
 | `agent_cycle` | `tab` | 切换 Agent |
 | `agent_cycle_reverse` | `shift+tab` | 反向切换 Agent |
+| `prompt_skills` | `none` | 打开 Skill 选择器 |
+
+### Diff viewer
+
+| 键名 | 默认值 | 说明 |
+|------|--------|------|
+| `diff_close` | `escape,q` | 关闭 viewer |
+| `diff_toggle` | `enter,space` | 展开或选择项目 |
+| `diff_expand` / `diff_collapse` | `right` / `left` | 展开或折叠项目 |
+| `diff_expand_all` | `E` | 展开全部目录 |
+| `diff_switch_focus` | `tab` | 切换焦点 |
+| `diff_next_hunk` / `diff_previous_hunk` | `]` / `[` | 下一个/上一个 hunk |
+| `diff_next_file` / `diff_previous_file` | `n` / `p` | 下一个/上一个文件 |
+| `diff_toggle_file_tree` | `b` | 切换文件树 |
+| `diff_single_patch` | `s` | 切换单个/全部 patch |
+| `diff_switch_source` | `d` | 切换来源 |
+| `diff_toggle_view` | `v` | 切换分栏/统一视图 |
+| `diff_help` | `?` | 显示帮助 |
+
+`m` 是 viewer 内置的“标记已审阅”按键，不属于 `keybinds` 配置项。
 
 ### 界面控制
 
@@ -254,7 +301,6 @@ OpenCode 桌面应用的输入框支持 Readline/Emacs 风格快捷键，这些�
 | `editor_open` | `<leader>e` | 打开编辑器 |
 | `sidebar_toggle` | `<leader>b` | 切换侧边栏 |
 | `scrollbar_toggle` | `none` | 切换滚动条 |
-| `username_toggle` | `none` | 切换用户名显示 |
 | `status_view` | `<leader>s` | 状态视图 |
 | `tool_details` | `none` | 工具详情 |
 | `command_list` | `ctrl+p` | 命令面板 |
@@ -375,6 +421,9 @@ u 撤销 r 重做不用愁
 
 ## 相关资源
 
+- [v1.18.22 TUI 配置加载](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) - 配置位置和优先级
+- [v1.18.22 TUI 配置迁移](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67) - 自动迁移与跳过条件
+- [v1.18.22 diff viewer](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L563-L704) - 当前导航、视图和来源能力
 - [配置选项参考](./config-ref) - 完整配置说明
 - [5.6b 快捷键](../5-advanced/06b-keybinds) - 快捷键定制教程
 - [5.6a 主题系统](../5-advanced/06a-themes) - 主题定制教程

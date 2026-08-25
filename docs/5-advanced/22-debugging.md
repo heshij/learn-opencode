@@ -27,7 +27,7 @@ OpenCode 内置了一套强大的调试工具箱 `opencode debug`。这些工具
 
 想知道你的配置到底怎么生效的？
 
-**重要场景**：OpenCode 的配置不仅来自 `opencode.json`，**插件也可以在启动时动态注入配置**。
+**重要场景**：OpenCode 的主配置不仅来自 `opencode.json`，**插件也可以在启动时动态注入配置**。
 
 如果你想确认：
 - 某个插件注入的配置是否生效？
@@ -43,8 +43,7 @@ opencode debug config
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "keybinds": { ... },
-  // 这里列出了所有已加载的 Agent（包括默认和自定义）
+  // 这里列出配置中声明的 Agent
   "agent": {
     "coder": { ... },
     "writer": { ... },
@@ -55,9 +54,16 @@ opencode debug config
 }
 ```
 
+::: warning TUI 配置不在这里
+`theme`、`keybinds` 和滚动、光标等界面设置已经移到独立的 `tui.json` / `tui.jsonc`。`opencode debug config` 读取的是主配置服务，因此输出中没有这些字段是正常现象；请直接检查对应层级的 TUI 配置文件及其 `https://opencode.ai/tui.json` Schema。
+:::
+
+如果旧主配置仍保留 `theme`、`keybinds` 或 `tui`，先检查同目录是否已有 `tui.json`：已有时自动迁移会跳过；只有 `tui.jsonc` 时不会跳过。没有目标文件时，启动 TUI 后应生成 `tui.json` 和 `<原主配置>.tui-migration.bak`；已有备份会被复用。只有新文件写入和备份成功后，旧字段才会从主配置删除。
+
+> 源码依据：[debug config 只读取主配置服务](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/debug/config.ts#L5-L13) 和 [TUI 迁移规则](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67)。
+
 ::: tip 💡 怎么看加载了哪些 Agent？
-直接看 `opencode debug config` 输出中的 `agent` 字段。这里列出了所有**已注册且可用**的 Agent。
-如果这里没有，说明 Agent 定义文件有问题，或者没被 OpenCode 扫描到。
+`opencode debug config` 的 `agent` 字段只能确认配置中声明的 Agent，不能代表运行时完整列表；内置 Agent 会由 Agent 服务另行组装。要查看当前可用 Agent，请使用 TUI 的 Agent 列表或 Agent API。
 :::
 
 ### 2. 调试文件系统 (File & Ripgrep)
@@ -179,7 +185,7 @@ opencode debug snapshot diff <hash>
 
 | 命令 | 用途 | 典型场景 |
 |------|------|----------|
-| `debug config` | 查看最终配置 | 检查配置是否生效、查看默认快捷键 |
+| `debug config` | 查看最终主配置 | 检查模型、Agent、权限等主配置是否生效 |
 | `debug agent <name>` | 查看 Agent 详情 | 检查 Prompt、权限、工具列表 |
 | `debug agent --tool` | **手动执行工具** | 验证工具参数格式、测试工具权限 |
 | `debug skill` | 列出 Skill | 确认 Skill 是否加载、查看加载路径 |

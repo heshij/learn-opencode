@@ -8,9 +8,9 @@ duration: "25 minutes"
 level: "Advanced"
 description: "OpenCode server provides a complete REST API for programmatic interaction with OpenCode."
 tags:
-  - API
-  - HTTP
-  - REST
+  - "API"
+  - "HTTP"
+  - "REST"
 prerequisite:
   - "5.9a Remote Mode Basics"
 ---
@@ -47,6 +47,31 @@ http://<hostname>:<port>/doc
 ```
 
 Example: `http://localhost:4096/doc`
+
+Most of the `/session`, `/file`, and `/event` paths covered below belong to the V1 API. `v1.18.22` retains V1 while extending V2 through `/api/*`; upgrading does not automatically convert existing V1 calls to V2.
+
+> Source: [`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20), [`V1 sdk.gen.ts:431-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L431-L700), [`V2 sdk.gen.ts:5426-5873`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5873)
+
+### V2 API Extensions
+
+V2 is more than a model catalog. In the target version, it extends sessions, questions, the current location, event streams, paginated history, runtime operations, and permission requests:
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/location` | Resolve the current directory/workspace location |
+| `GET` / `POST` | `/api/session` | List sessions with pagination / create a session |
+| `GET` | `/api/session/:sessionID` | Get a session |
+| `GET` | `/api/session/:sessionID/history` | Read a bounded page of events using `after` and `limit` |
+| `GET` | `/api/session/:sessionID/event` | Replay and then continuously subscribe to events for the session |
+| `POST` | `/api/session/:sessionID/interrupt` | Interrupt an active execution owned by the current process |
+| `GET` | `/api/session/:sessionID/question` | List pending questions for the session |
+| `POST` | `/api/session/:sessionID/question/:requestID/reply` | Answer a pending question |
+| `POST` | `/api/session/:sessionID/question/:requestID/reject` | Reject a pending question |
+| `GET` / `POST` | `/api/session/:sessionID/permission` | List or create session-level permission requests |
+| `GET` | `/api/permission/request` | List pending permission requests by location |
+| `GET` | `/api/event` | V2 server-event SSE stream |
+
+> Source: [`sdk.gen.ts:5038-5058`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5038-L5058), [`sdk.gen.ts:5171-5424`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5171-L5424), [`sdk.gen.ts:5426-5793`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5426-L5793), [`sdk.gen.ts:6319-6405`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L6319-L6405), [`sdk.gen.ts:6549-6559`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L6549-L6559)
 
 ---
 
@@ -88,10 +113,10 @@ curl -H "Authorization: Basic $(echo -n 'opencode:your-password' | base64)" \
 **Example**:
 
 ```bash
-# Check server health (no auth)
+# No authentication is required when no server password is configured
 curl http://localhost:4096/global/health
 
-# If server has password set
+# After configuring OPENCODE_SERVER_PASSWORD, health also requires Basic Auth
 curl -u opencode:your-password http://localhost:4096/global/health
 ```
 
@@ -198,11 +223,15 @@ This is the most commonly used API for managing conversation sessions.
 | `DELETE` | `/session/:id/share` | Unshare session | Returns `Session` |
 | `GET` | `/session/:id/diff` | Get session file diff | query: `messageID?` |
 | `POST` | `/session/:id/summarize` | Summarize session | body: `{ providerID, modelID }` |
-| `POST` | `/session/:id/revert` | Revert message | body: `{ messageID, partID? }` |
-| `POST` | `/session/:id/unrevert` | Restore all reverted messages | Returns `boolean` |
-| `POST` | `/session/:id/permissions/:permissionID` | Respond to permission request | body: `{ response, remember? }` |
+| `POST` | `/session/:id/revert` | Undo to a specific message/part and roll back related file patches by default | body: `{ messageID, partID? }` |
+| `POST` | `/session/:id/unrevert` | Redo the reverted message and file state | Returns `Session` |
+| `POST` | `/session/:id/permissions/:permissionID` | Respond to permission request | body: `{ response }` |
 
 > Source: `opencode/packages/web/src/content/docs/server.mdx:135-157`
+
+`revert` does more than hide chat messages: the service locates the target boundary, collects subsequent patches, restores the snapshot, and updates the session diff. `unrevert` restores the original snapshot and clears the revert state. Both operations require the session to be idle. Setting `snapshot: false` disables only file-snapshot undo/redo; message-boundary revert semantics remain available.
+
+> Source: [`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98), [`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55), [`V1 sdk.gen.ts:678-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L678-L700)
 
 **Example - Create new session**:
 
@@ -211,6 +240,26 @@ curl -X POST http://localhost:4096/session \
   -H "Content-Type: application/json" \
   -d '{"title": "Code Review Session"}'
 ```
+
+---
+
+## Workspace API (Experimental)
+
+In `v1.18.22`, workspaces are adapter-driven. The built-in adapter is `worktree`, and the API can list adapters, create or discover workspaces, inspect connection status, and warp sessions. Requests can use the `directory` / `workspace` query parameters for workspace-aware routing; `warp` with `copyChanges` copies the Git patch.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/experimental/workspace/adapter` | List adapters available to the current project |
+| `GET` / `POST` | `/experimental/workspace` | List / create workspaces |
+| `POST` | `/experimental/workspace/sync-list` | Register workspaces discovered by an adapter but not yet recorded |
+| `GET` | `/experimental/workspace/status` | Get connection status |
+| `POST` | `/experimental/workspace/warp` | Move a session, optionally with `copyChanges` |
+
+::: warning Historical boundary
+The v1.16.0 release promised that managed workspace cloning would preserve dirty and untracked files. In the target tag, the current implementation has moved to the adapter/worktree path. That historical capability must not be treated as current `v1.18.22` API behavior: the implementation evidence for `copyChanges` is a Git patch, with no promise to copy all untracked files.
+:::
+
+> Current implementation: [`workspace API paths:12-47`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/groups/workspace.ts#L12-L47), [`workspace API endpoints:53-127`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/groups/workspace.ts#L53-L127), [`workspace.ts:492-538`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L492-L538), [`workspace.ts:559-620`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/control-plane/workspace.ts#L559-L620), [`workspace-routing.ts:148-185`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/server/routes/instance/httpapi/middleware/workspace-routing.ts#L148-L185). Historical evidence: [`v1.16.0 Release`](https://github.com/anomalyco/opencode/releases/tag/v1.16.0), commit `5661af203487b90cf9ee0844b198b03cce26c412`.
 
 ---
 
@@ -232,11 +281,14 @@ curl -X POST http://localhost:4096/session \
 ```typescript
 {
   messageID?: string,     // Optional, message ID
-  model?: string,         // Optional, specify model
+  model?: {               // Optional, specify model
+    providerID: string,
+    modelID: string
+  },
   agent?: string,         // Optional, specify agent
   noReply?: boolean,      // Optional, don't wait for reply
   system?: string,        // Optional, system prompt
-  tools?: string[],       // Optional, enabled tools
+  tools?: Record<string, boolean>, // Deprecated; prefer permission configuration
   parts: Part[]           // Message content
 }
 ```
@@ -476,7 +528,7 @@ data: {"sessionID":"abc123","content":"..."}
 Complete TypeScript type definitions can be found in the SDK:
 
 ```
-https://github.com/opencode-ai/opencode/blob/dev/packages/sdk/js/src/gen/types.gen.ts
+https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/types.gen.ts
 ```
 
 Common types:
@@ -516,8 +568,8 @@ You learned:
 
 ## Related Resources
 
-- [5.9a Remote Mode Basics](./09a-remote-basics) - Server startup and remote connection
-- [5.10 SDK](./10a-sdk-basics) - JavaScript/TypeScript SDK
+- [5.9a Remote Mode Basics](/en/5-advanced/09a-remote-basics) - Server startup and remote connection
+- [5.10 SDK](/en/5-advanced/10a-sdk-basics) - JavaScript/TypeScript SDK
 - [Official API Docs](https://opencode.ai/docs/server) - Complete English documentation
 
 ---

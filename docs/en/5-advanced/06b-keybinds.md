@@ -1,13 +1,13 @@
 ---
 title: "5.6b Keybindings"
-subtitle: "Muscle Memory for Efficient Operations"
+subtitle: "Build Muscle Memory for Faster Workflows"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.6b"
 duration: "10 minutes"
 practice: "15 minutes"
 level: "Advanced"
-description: "Customize 60+ keybindings for a smooth operational experience."
+description: "Customize 60+ keybindings to create a comfortable, efficient workflow."
 tags:
   - "keybindings"
   - "efficiency"
@@ -18,7 +18,7 @@ prerequisite:
 
 # 5.6b Keybindings
 
-> 60+ fully customizable keybindings for a smooth operational experience.
+> Customize 60+ keybindings to build a workflow that feels natural.
 
 ## 📝 Course Notes
 
@@ -55,11 +55,11 @@ Ctrl+X → m    # Model list
 
 ## Keybinding Configuration
 
-Configure in `opencode.json`:
+TUI keybindings use a flat `keybinds` map in a standalone `tui.json` or `tui.jsonc` file:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     // Change Leader key
     "leader": "ctrl+x",
@@ -72,22 +72,32 @@ Configure in `opencode.json`:
     "app_exit": "ctrl+c,ctrl+d,<leader>q",
     
     // Disable keybinding
-    "session_compact": "none"
+    "session_compact": false
   }
 }
 ```
 
-> **Note**: The config key is `keybinds` (plural), this is the only config key that uses plural form!
+The common config locations are listed below. Later configs override earlier ones:
+
+1. `tui.json` / `tui.jsonc` in the global config directory
+2. A custom file referenced by `OPENCODE_TUI_CONFIG`
+3. `tui.json` / `tui.jsonc` files discovered from the current directory up to the filesystem root, then applied from the rootmost directory back toward the current directory
+4. `.opencode/tui.json` / `.opencode/tui.jsonc` files encountered along the way
+5. TUI configuration in `OPENCODE_CONFIG_DIR`
+
+Ordinary project files are applied from the root side toward the current directory, so the nearest one wins. Multiple `.opencode` directories are merged in the opposite direction—from the current side toward the root—so on conflicts the rootmost directory is loaded later and wins. `OPENCODE_CONFIG_DIR` is loaded last.
+
+When upgrading from an older release, the TUI checks legacy main configs in the global location, along the project path, in config directories, and at the path specified by `OPENCODE_CONFIG`. It migrates their `theme`, `keybinds`, and legacy `tui` fields into a `tui.json` in the same directory. If the target `tui.json` already exists, that directory is skipped; `tui.jsonc` alone does not prevent migration. Only after the new file has been written successfully and a `.tui-migration.bak` backup has been created or reused are the legacy fields removed from the original config. The main config no longer reads these TUI fields.
 
 ### Disable Keybindings
 
-Set to `"none"` to disable:
+Set a binding to `"none"` or `false` to disable it:
 
 ```jsonc
 {
   "keybinds": {
     "session_compact": "none",
-    "sidebar_toggle": "none"
+    "sidebar_toggle": false
   }
 }
 ```
@@ -106,7 +116,7 @@ Use commas to separate multiple keys:
 
 ---
 
-## Complete Keybinding List
+## Common Configurable Keybindings
 
 ### Application Control
 
@@ -114,6 +124,7 @@ Use commas to separate multiple keys:
 |----------|---------|-------------|
 | `leader` | `ctrl+x` | Leader key |
 | `app_exit` | `ctrl+c,ctrl+d,<leader>q` | Exit application |
+| `diff_open` | `none` | Open the diff viewer (normally opened through `/diff` or the command palette) |
 | `terminal_suspend` | `ctrl+z` | Suspend terminal |
 | `terminal_title_toggle` | `none` | Toggle terminal title |
 
@@ -125,7 +136,6 @@ Use commas to separate multiple keys:
 | `theme_list` | `<leader>t` | Theme list |
 | `sidebar_toggle` | `<leader>b` | Toggle sidebar |
 | `scrollbar_toggle` | `none` | Toggle scrollbar |
-| `username_toggle` | `none` | Toggle username display |
 | `status_view` | `<leader>s` | Status view |
 | `tool_details` | `none` | Toggle tool details |
 | `tips_toggle` | `<leader>h` | Toggle homepage tips |
@@ -141,9 +151,10 @@ Use commas to separate multiple keys:
 | `session_export` | `<leader>x` | Export session |
 | `session_timeline` | `<leader>g` | Session timeline |
 | `session_interrupt` | `escape` | Interrupt response |
+| `session_background` | `ctrl+b` | Move a synchronously running subagent into the background |
 | `session_compact` | `<leader>c` | Compact context |
 | `session_fork` | `none` | Fork from message |
-| `session_rename` | `none` | Rename session |
+| `session_rename` | `ctrl+r` | Rename session |
 | `session_share` | `none` | Share session |
 | `session_unshare` | `none` | Unshare session |
 
@@ -151,9 +162,9 @@ Use commas to separate multiple keys:
 
 | Key Name | Default | Description |
 |----------|---------|-------------|
-| `session_child_cycle` | `<leader>right` | Cycle child sessions |
-| `session_child_cycle_reverse` | `<leader>left` | Cycle child sessions (reverse) |
-| `session_parent` | `<leader>up` | Return to parent session |
+| `session_child_cycle` | `right` | Cycle child sessions |
+| `session_child_cycle_reverse` | `left` | Cycle child sessions in reverse |
+| `session_parent` | `up` | Return to the parent session |
 
 ### Message Operations
 
@@ -164,12 +175,35 @@ Use commas to separate multiple keys:
 | `messages_redo` | `<leader>r` | Redo message |
 | `messages_toggle_conceal` | `<leader>h` | Toggle code block folding |
 
+Here, `messages_undo` and `messages_redo` operate at the session level. Undo returns to the selected message and rolls back the associated file patches that came after it; redo restores the reverted state. If you set `"snapshot": false` in the main `opencode.json` or `opencode.jsonc`, messages can still be reverted, but file changes will not be undone or restored. These bindings are distinct from `input_undo` and `input_redo` inside the input field.
+
+### Diff Viewer
+
+The diff viewer is enabled by default. Open it with `/diff`, the command palette, or a custom `diff_open` binding. It includes a file tree and can switch between workspace changes and changes from the latest AI turn. If the current branch is not the default branch, it also offers a comparison against the main branch. The viewer supports file and hunk navigation, single-file patches, unified and split views, and reviewed markers.
+
+| Key Name | Default | Description |
+| --- | --- | --- |
+| `diff_close` | `escape,q` | Close the viewer and return to the previous screen |
+| `diff_toggle` | `enter,space` | Expand a directory or select a file |
+| `diff_expand` / `diff_collapse` | `right` / `left` | Expand or collapse a file-tree item |
+| `diff_expand_all` | `E` | Expand all directories |
+| `diff_switch_focus` | `tab` | Move focus between the file tree and patch pane |
+| `diff_next_hunk` / `diff_previous_hunk` | `]` / `[` | Jump to the next or previous hunk |
+| `diff_next_file` / `diff_previous_file` | `n` / `p` | Jump to the next or previous file |
+| `diff_toggle_file_tree` | `b` | Show or hide the file tree |
+| `diff_single_patch` | `s` | Switch between a single patch and all patches |
+| `diff_switch_source` | `d` | Switch the diff source |
+| `diff_toggle_view` | `v` | Switch between split and unified views |
+| `diff_help` | `?` | Show the complete diff keybinding help |
+
+`m` is the diff viewer's built-in “mark as reviewed” key. It is not part of the configurable `keybinds` map.
+
 ### Message Scrolling
 
 | Key Name | Default | Description |
 |----------|---------|-------------|
-| `messages_page_up` | `pageup` | Page up |
-| `messages_page_down` | `pagedown` | Page down |
+| `messages_page_up` | `pageup,ctrl+alt+b` | Page up |
+| `messages_page_down` | `pagedown,ctrl+alt+f` | Page down |
 | `messages_half_page_up` | `ctrl+alt+u` | Half page up |
 | `messages_half_page_down` | `ctrl+alt+d` | Half page down |
 | `messages_first` | `ctrl+g,home` | Jump to first |
@@ -192,6 +226,7 @@ Use commas to separate multiple keys:
 | `agent_cycle` | `tab` | Cycle Agent |
 | `agent_cycle_reverse` | `shift+tab` | Cycle Agent (reverse) |
 | `command_list` | `ctrl+p` | Command palette |
+| `prompt_skills` | `none` | Open the Skill picker |
 
 ### Input Area Basics
 
@@ -220,6 +255,22 @@ Use commas to separate multiple keys:
 | `input_visual_line_end` | `alt+e` | Move to visual line end |
 | `input_buffer_home` | `home` | Move to buffer start |
 | `input_buffer_end` | `end` | Move to buffer end |
+
+### Cursor Appearance
+
+Cursor appearance is not a keybinding. Configure it alongside `keybinds`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "cursor": {
+    "style": "line",
+    "blinking": true
+  }
+}
+```
+
+`style` can be `block`, `underline`, `line`, or `default`. The `default` value preserves your terminal settings, in which case `blinking` has no effect.
 
 ### Input Area Selection
 
@@ -259,7 +310,7 @@ Use commas to separate multiple keys:
 
 ---
 
-## Desktop Version Keybindings
+## OpenCode Desktop Keybindings
 
 OpenCode Desktop's input field supports Readline/Emacs style keybindings (built-in, not configurable):
 
@@ -358,7 +409,7 @@ Disable uncommon keybindings:
 }
 ```
 
-### One-Handed Operation
+### One-Handed Layout
 
 Concentrate common operations on the left hand:
 
@@ -382,7 +433,7 @@ Concentrate common operations on the left hand:
 | Keybinding not working | Terminal intercepted the key | Check terminal settings or use a different key |
 | Shift+Enter doesn't create new line | Terminal doesn't send modifier key | Configure terminal (see above) |
 | Configured but no response | Used `keybind` (singular) | Use `keybinds` (plural) |
-| Using `null` to disable doesn't work | Syntax error | Use `"none"` string instead |
+| Using `null` to disable doesn't work | Syntax error | Use `"none"` or `false` instead |
 | Leader key conflict | Conflicts with other programs | Use a different Leader key like `ctrl+space` |
 | Ctrl+C doesn't clear input | Intercepted by terminal's SIGINT | Use a different key or accept default behavior |
 
@@ -392,10 +443,10 @@ Concentrate common operations on the left hand:
 
 ```
 Tab cycles Agent, Ctrl+C clears
-Leader plus letter, any function appears
+Press Leader, then a letter for the action you need
 n for new, l for list, m for model
-u for undo, r for redo, no need to huddle
-Arrow keys left and right, child sessions take flight
+u to undo, r to redo
+Left and right arrows cycle through child sessions
 ```
 
 ---
@@ -406,7 +457,7 @@ You learned:
 
 1. Using the Leader key mechanism to avoid conflicts
 2. Customizing keybindings in `keybinds`
-3. Using `"none"` to disable unwanted keybindings
+3. Using `"none"` or `false` to disable unwanted keybindings
 4. Using commas to bind multiple keys
 5. Resolving terminal Shift+Enter compatibility issues
 
@@ -414,6 +465,14 @@ You learned:
 
 ## Related Resources
 
-- [Quick Reference/Keybindings Cheat Sheet](../appendix/keybinds) - Printable cheat sheet
-- [5.6a Theme System](./06a-themes) - Appearance customization
-- [5.1 Configuration Guide](./01a-config-basics) - Complete configuration reference
+- [v1.18.22 keybinding definitions](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L28-L75) - Flat bindings, disabled values, and default diff keys
+- [v1.18.22 background-session and Skill bindings](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L86-L98) / [Skill](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L153-L159) - New bindings and their defaults
+- [v1.18.22 cursor configuration](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L33-L40) - Cursor shape and blinking
+- [v1.18.22 TUI config loading order](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui.ts#L171-L209) - Global, custom, project, and `.opencode` configs
+- [v1.18.22 TUI config migration](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/tui-migrate.ts#L24-L67) - Migration from `opencode.json` to `tui.json`
+- [v1.18.22 diff viewer](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L563-L704) - Navigation, views, and source switching
+- [v1.18.22 session revert](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98) - Revert/unrevert behavior and file-patch restoration
+- [v1.18.22 snapshot configuration](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55) - File-restoration boundary when `snapshot:false`
+- [Quick Reference / Keybindings Cheat Sheet](/en/appendix/keybinds) - Printable cheat sheet
+- [5.6a Theme System](/en/5-advanced/06a-themes) - Appearance customization
+- [5.1 Configuration Guide](/en/5-advanced/01a-config-basics) - Complete configuration reference

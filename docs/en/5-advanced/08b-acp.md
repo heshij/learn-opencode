@@ -9,10 +9,10 @@ practice: "20 minutes"
 level: "Advanced"
 description: "Use OpenCode in Zed, JetBrains, Neovim, and other editors through the ACP protocol."
 tags:
-  - ACP
-  - Zed
-  - JetBrains
-  - Neovim
+  - "ACP"
+  - "Zed"
+  - "JetBrains"
+  - "Neovim"
 prerequisite:
   - "5.8a VS Code Extension"
 ---
@@ -31,7 +31,7 @@ Key points from this lesson:
 
 ## What You'll Learn
 
-- Understand what ACP protocol is
+- Understand what ACP is
 - Configure OpenCode in Zed
 - Configure OpenCode in JetBrains IDE
 - Configure OpenCode in Neovim
@@ -53,9 +53,11 @@ Editor ←→ JSON-RPC (stdio) ←→ opencode acp
 
 The editor starts `opencode acp` as a child process and communicates via stdin/stdout using nd-JSON (newline-delimited JSON) format for JSON-RPC communication.
 
+Some transitional releases called this new implementation `acp-next`. By `v1.18.22`, it had become the official `opencode acp` implementation; there is no separate `opencode acp-next` command to start. Source: [ACP command entry point](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/acp.ts#L9-L25) and [current Agent implementation](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/agent.ts#L32-L85).
+
 ---
 
-## Starting the ACP Service
+## Start the ACP Service
 
 ```bash
 opencode acp
@@ -74,6 +76,8 @@ opencode acp
 ---
 
 ## Zed Configuration
+
+The OpenCode repository once bundled a Zed extension, but that extension has been removed. With `v1.18.22`, start `opencode acp` through Zed's ACP `agent_servers` configuration. Do not look for or install the old bundled extension from the repository.
 
 Add to [Zed](https://zed.dev) configuration file `~/.config/zed/settings.json`:
 
@@ -215,20 +219,24 @@ To pass environment variables, refer to [CodeCompanion documentation](https://co
 
 ## Supported Features
 
-Using OpenCode via ACP provides the same functionality as the terminal version:
+The ACP implementation in `v1.18.22` is not equivalent to the complete TUI, but it covers the core session capabilities:
 
 | Feature | Supported |
 |---------|-----------|
-| Built-in tools (file operations, terminal commands, etc.) | ✅ |
-| Custom tools and slash commands | ✅ |
-| MCP servers | ✅ |
-| `AGENTS.md` project rules | ✅ |
-| Custom formatters | ✅ |
-| Agent and permission system | ✅ |
+| Send prompts and stream messages, tool calls, and permission requests | ✅ |
+| Discover and run currently available slash commands | ✅ |
+| Create, list, load, replay, resume, and close sessions | ✅ |
+| Cancel a running prompt | ✅ |
+| Select a model | ✅ |
+| Select an Agent (shown as Session Mode in ACP) | ✅ |
+| Select a model variant (shown as Effort in ACP) | ✅ |
+| Register MCP servers supplied by the client | ✅ |
+
+For the Agent entry methods, see [`acp/agent.ts:43-84`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/agent.ts#L43-L84). For session loading, message replay, and command submission, see [`acp/service.ts:211-235`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/service.ts#L211-L235) and [`acp/service.ts:494-543`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/service.ts#L494-L543). For the Model, Effort, and Session Mode options, see [`acp/config-option.ts:38-109`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/acp/config-option.ts#L38-L109).
 
 ### Unsupported Features
 
-The following TUI-specific commands are not available in ACP mode:
+Do not assume the TUI command list is also the ACP slash-command list. The following TUI-specific commands are not available in ACP mode:
 
 - `/undo` - Undo message
 - `/redo` - Redo message
@@ -250,8 +258,8 @@ The following TUI-specific commands are not available in ACP mode:
 
 ## Further Reading
 
-- [5.8a VS Code Extension](./08a-ide-vscode) - VS Code/Cursor extension installation
-- [Cheatsheet / CLI Reference](../appendix/cli) - Complete command-line options
+- [5.8a VS Code Extension](/en/5-advanced/08a-ide-vscode) - VS Code/Cursor extension installation
+- [Cheatsheet / CLI Reference](/en/appendix/cli) - Complete command-line options
 - [ACP Official Website](https://agentclientprotocol.com) - Protocol specification
 
 ---

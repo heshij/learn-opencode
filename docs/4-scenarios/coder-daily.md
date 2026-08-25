@@ -79,13 +79,16 @@ prerequisite:
 | 写新功能 | Build | 分步实现、迭代修改 |
 | 修 Bug | Plan→Build | 先分析原因，再修复 |
 
-### 语法速查（本课只用这 3 个）
+### 语法速查（本课只用这 4 个）
 
 - `@path`：把文件内容带进对话
 - `!command`：在 TUI 里执行命令，把输出带进对话
-- `/undo`：撤销最近一次对话变更，并回滚相关文件改动（需要 Git 仓库）
+- `/undo`：回到上一条用户消息，并回滚之后关联的文件补丁（文件恢复需要 Git 仓库）
+- `/redo`：恢复刚撤销的会话内容和关联文件
 
 详细语法见：https://opencode.ai/docs/tui
+
+> 如果在主配置中设置 `"snapshot": false`，`/undo` 和 `/redo` 仍会移动会话边界，但不会恢复文件。源码参考：[`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98)、[`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)。
 
 ---
 
@@ -300,7 +303,7 @@ prerequisite:
 
 - 主 Agent（`build` / `plan`）：用 `Tab` 切换；用 `Shift+Tab` 反向切换。
 - Agent 列表：`<leader>a`（默认 leader 是 `ctrl+x`，即先按 `ctrl+x` 再按 `a`）。
-- 子会话导航：`<leader>right` / `<leader>left` / `<leader>up`。
+- 子会话导航：`Right` 切换到下一个子会话，`Left` 切换到上一个子会话，`Up` 返回父会话。这三项默认直接使用方向键，不需要先按 Leader。
 
 需要更完整的快捷键列表：见 [5.6b 快捷键](../5-advanced/06b-keybinds)。
 

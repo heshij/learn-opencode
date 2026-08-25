@@ -280,6 +280,10 @@ filesystem     服务器的 read_file 工具 → filesystem_read_file
 context7 服务器的 search 工具  → context7_search
 ```
 
+服务器名和工具名中的非字母、数字、下划线或连字符会替换为下划线。`v1.18.22` 使用的仍是上述旧格式；`mcp__服务器名__工具名` 只在开发过程中短暂出现过，随后已恢复，不能作为当前配置权限或提示词的依据。
+
+源码：[当前工具名的清理与拼接规则](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/catalog.ts#L117-L119)。
+
 ### 自动发现机制
 
 配置 MCP 服务器后，OpenCode 会**自动发现**服务器提供的所有工具：
@@ -298,6 +302,42 @@ context7 服务器的 search 工具  → context7_search
 - 无需重启 OpenCode
 
 这意味着：升级 MCP 服务器版本后，新工具会自动可用。
+
+### 服务器 instructions
+
+MCP 服务器可以在初始化结果中返回 instructions。OpenCode 会把已连接服务器的 instructions 加入系统提示词；如果服务器提供了工具，但这些工具全部被当前 Agent 或会话权限禁用，就不会注入这段说明。
+
+源码：[instructions 的权限过滤与注入](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L119-L134)。
+
+### Resources 与 templates
+
+只要至少一个已连接服务器声明 `resources` capability，OpenCode 就会提供三个通用工具：
+
+| 工具 | 用途 |
+|------|------|
+| `list_mcp_resources` | 列出全部或指定服务器的资源 |
+| `list_mcp_resource_templates` | 列出带 URI 参数的资源模板 |
+| `read_mcp_resource` | 按服务器名和精确 URI 读取资源 |
+
+资源可以是文件、数据库 Schema 或服务自己的上下文。模板本身需要先填充 URI 参数，再把得到的 URI 交给 `read_mcp_resource`。应用界面也可以通过 `@` 补全并加入 MCP 资源。
+
+源码：[工具名称](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L27-L31)、[资源能力判断](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L136-L155)、[templates](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L222-L245)、[读取资源](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L305-L325)、[应用内资源补全](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/app/src/components/prompt-input/slash-popover.tsx#L120-L163)。
+
+---
+
+## 实验性 MCP Code Mode
+
+设置以下环境变量并重启 OpenCode：
+
+```bash
+export OPENCODE_EXPERIMENTAL_CODE_MODE=true
+```
+
+启用开关并不保证一定看到 `execute`。只有当前 Agent 和会话权限下至少一个 MCP 工具可见时，`execute` 才会注册给模型；启用后，普通 MCP 工具不再逐个直接暴露，而是由 `execute` 编排调用。
+
+`execute` 运行的是受限解释器代码，不是普通 shell。它只能访问目录化后的可见 MCP 工具，并且每个实际 MCP 调用仍会经过原工具的权限检查。适合一次编排多个 MCP 调用，不适合执行任意本地程序或访问未授权工具。
+
+源码：[筛选可见 MCP 工具](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L188-L212)、[受限运行时](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/code-mode.ts#L239-L274)、[`execute` 可见条件](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/tool/registry.ts#L280-L308)。
 
 ---
 
@@ -518,8 +558,10 @@ use the gh_grep tool 搜索 SST 框架中如何配置自定义域名
 3. **状态图标**：✓ ○ ⚠ ✗ 四种状态的含义
 4. **权限管理**：使用 `permission` 控制工具访问
 5. **工具自动发现**：工具命名规则和变更通知机制
-6. **规则集成**：在 AGENTS.md 中配置默认 MCP 使用
-7. **常用 MCP**：Sentry、Context7、Grep、Postgres 等
+6. **扩展上下文**：服务器 instructions、resources 与 templates
+7. **Code Mode**：在受限环境中编排获准的 MCP 工具
+8. **规则集成**：在 AGENTS.md 中配置默认 MCP 使用
+9. **常用 MCP**：Sentry、Context7、Grep、Postgres 等
 
 ---
 

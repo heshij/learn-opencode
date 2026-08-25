@@ -91,23 +91,17 @@ prerequisite:
 | 对话区 | AI 回复和你的消息历史 |
 | 输入区 | 你输入消息的地方（不同模式有不同提示） |
 
-::: details 🆕 v1.1.57~v1.1.60 新增功能
+::: details 界面显示规则
 
-**1. 侧栏自动显示/隐藏（v1.1.57）**
+**1. 侧栏自动显示/隐藏**
 - 宽屏（>120 列）时自动显示会话列表
 - 窄屏时自动隐藏，节省空间
-- 可通过 `session.toggle.sidebar` 命令手动切换
 
-**2. 输入框智能提示（v1.1.58）**
+**2. 输入框智能提示**
 - 不同模式显示不同的占位符提示
 - 普通模式：`随便问点什么...`
 - Shell 模式：`输入 shell 命令...`
 - 评论总结模式：`总结评论...`
-
-**3. 隐藏会话头部（v1.1.60）**
-- 可通过命令面板隐藏顶部状态栏
-- 适合需要更多对话空间的场景
-- 搜索 `session.toggle.header` 即可切换
 :::
 
 ### 核心操作三件套
@@ -205,13 +199,11 @@ AI 会自动调用相应的工具来执行。
 | `/help` | 查看帮助 |
 | `/new` | 新建会话 |
 | `/models` | 切换模型 |
-| `/theme` | 切换主题 |
+| `/themes` | 切换主题 |
 | `/exit` | 退出 |
 
-::: tip 💡 界面自定义命令
-在命令面板（<kbd>Ctrl</kbd>+<kbd>X</kbd>）中搜索：
-- `session.toggle.sidebar` - 切换侧栏显示
-- `session.toggle.header` - 切换头部显示
+::: tip 💡 命令面板
+按 <kbd>Ctrl</kbd>+<kbd>P</kbd> 打开命令面板；<kbd>Ctrl</kbd>+<kbd>X</kbd> 是 Leader 前缀，不会单独打开面板。
 :::
 
 ### 第 6 步：学会常用快捷键
@@ -222,11 +214,23 @@ AI 会自动调用相应的工具来执行。
 | 快捷键 | 作用 |
 |-------|------|
 | <kbd>Tab</kbd> | 切换 Plan/Build 模式 |
-| <kbd>Ctrl</kbd>+<kbd>C</kbd> | 中断当前操作 |
-| <kbd>Ctrl</kbd>+<kbd>L</kbd> | 清屏 |
+| <kbd>Esc</kbd> | 中断当前响应或返回上一层 |
+| <kbd>Ctrl</kbd>+<kbd>C</kbd> | 清空输入；也可用于退出应用 |
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> | Leader 键（前缀键） |
 | <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>N</kbd> | 新建会话 |
-| <kbd>Esc</kbd> | 取消/返回 |
+
+### 第 7 步：用 diff viewer 审阅改动
+
+输入 `/diff`（或在命令面板搜索 `Open diff viewer`）即可打开默认启用的 diff viewer。它用文件树组织改动，支持：
+
+- 按文件和 hunk 导航
+- 在单个 patch 与全部 patch 之间切换
+- 在统一视图与分栏视图之间切换（终端过窄时只显示统一视图）
+- 查看工作区改动、最后一轮 AI 产生的改动；当前分支不是默认分支时，还可查看与主分支的差异
+
+常用按键：<kbd>]</kbd> / <kbd>[</kbd> 切换 hunk，<kbd>n</kbd> / <kbd>p</kbd> 切换文件，<kbd>d</kbd> 切换来源，<kbd>v</kbd> 切换视图，<kbd>m</kbd> 标记文件已审阅，<kbd>?</kbd> 查看完整帮助，<kbd>Esc</kbd> / <kbd>q</kbd> 关闭并返回上一屏。
+
+> 源码参考：[v1.18.22 diff viewer 导航与来源](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L563-L704)、[入口命令](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/feature-plugins/system/diff-viewer.tsx#L1045-L1071)。
 
 ::: details 📦 什么是 Leader 键
 Leader 键是一种快捷键组合方式。先按 <kbd>Ctrl</kbd>+<kbd>X</kbd>，松开后再按另一个键。
@@ -246,6 +250,7 @@ Leader 键是一种快捷键组合方式。先按 <kbd>Ctrl</kbd>+<kbd>X</kbd>�
 - [ ] 用 `!命令` 能执行系统命令
 - [ ] 用 `/help` 能看到帮助信息
 - [ ] <kbd>Tab</kbd> 键能切换 Plan/Build 模式
+- [ ] 用 `/diff` 能打开 diff viewer 并切换文件或 hunk
 
 ---
 

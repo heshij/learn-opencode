@@ -9,9 +9,9 @@ practice: "30 min"
 level: "Advanced"
 description: "Use the SDK to control OpenCode programmatically for automation and deep integration."
 tags:
-  - SDK
-  - Programming Interface
-  - Automation
+  - "SDK"
+  - "Programming Interface"
+  - "Automation"
 prerequisite:
   - "5.1 Configuration Guide"
   - "5.9 Remote Development"
@@ -82,6 +82,20 @@ Key takeaways from this lesson:
 npm install @opencode-ai/sdk
 ```
 
+### V1 and V2 Entry Points
+
+The examples in this lesson use the V1 entry point, `@opencode-ai/sdk`. As of `v1.18.22`, V1 has **not been removed**. The same package also exports `@opencode-ai/sdk/v2`, which provides V2 extensions for sessions, questions, the current location, event streams, paginated history, runtime operations, and permission requests. The two entry points use different parameter structures—do not simply change the import and continue using V1-style `{ path, body }` calls.
+
+```typescript
+// V1: used by the remaining examples in this lesson
+import { createOpencodeClient } from "@opencode-ai/sdk"
+
+// V2: flat parameters; see Lesson 5.10c
+import { createOpencodeClient as createV2Client } from "@opencode-ai/sdk/v2"
+```
+
+> Source: [`packages/sdk/js/package.json:12-20`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/package.json#L12-L20), [`V1 sdk.gen.ts:431-700`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/gen/sdk.gen.ts#L431-L700), [`V2 location:5038-5058`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5038-L5058), [`V2 session:5171-5793`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/sdk/js/src/v2/gen/sdk.gen.ts#L5171-L5793)
+
 ---
 
 ## Three Usage Modes
@@ -110,10 +124,10 @@ server.close()
 | `hostname` | `string` | Server hostname | `127.0.0.1` |
 | `port` | `number` | Server port | `4096` |
 | `signal` | `AbortSignal` | Abort signal for cancellation | `undefined` |
-| `timeout` | `number` | Server startup timeout (ms) | `2000+` |
+| `timeout` | `number` | Server startup timeout (ms) | `5000` |
 | `config` | `Config` | Config object to override `opencode.json` | `{}` |
 
-> **Source**: `packages/sdk/js/src/server.ts:4-10`
+> **Source**: `packages/sdk/js/src/server.ts:5-11`
 
 #### Configuration Override Example
 
@@ -164,7 +178,7 @@ const sessions = await client.session.list()
 | `throwOnError` | `boolean` | Throw on error instead of returning | `false` |
 | `directory` | `string` | Project directory (passed via `X-Opencode-Directory` header) | `undefined` |
 
-> **Source**: `packages/sdk/js/src/gen/client/types.gen.ts:10-52`, `packages/sdk/js/src/client.ts:8`
+> **Source**: `packages/sdk/js/src/gen/client/types.gen.ts:10-52`, `packages/sdk/js/src/client.ts:33`
 
 #### Switching Project Directories
 
@@ -207,7 +221,7 @@ Authorization: `Basic ${Buffer.from("opencode:password").toString("base64")}`
 | Default | `opencode` | Server default username |
 | Custom | Value of `OPENCODE_SERVER_USERNAME` env var | If server has custom username |
 
-> **Source**: `packages/opencode/src/server/server.ts:84-87` (Basic Auth middleware)
+> **Source**: `packages/opencode/src/server/auth.ts:36-42` (Basic Auth header generation), `packages/opencode/src/server/routes/instance/httpapi/middleware/authorization.ts` (request parsing)
 
 ---
 
@@ -243,7 +257,7 @@ tui.close()
 | `signal` | `AbortSignal` | Abort signal for cancellation |
 | `config` | `Config` | Configuration object |
 
-> **Source**: `packages/sdk/js/src/server.ts:12-19`
+> **Source**: `packages/sdk/js/src/server.ts:13-20`
 
 ---
 
@@ -318,16 +332,12 @@ const textResults = await client.find.text({
 
 // Find files (supports glob patterns)
 const files = await client.find.files({
-  query: { 
-    query: "*.ts", 
-    type: "file",
-    limit: 100,  // Max 100 results
-  },
+  query: { query: "*.ts" },
 })
 
-// Find directories
+// Find directories only
 const dirs = await client.find.files({
-  query: { query: "src", type: "directory" },
+  query: { query: "src", dirs: "true" },
 })
 
 // Read file content
@@ -414,7 +424,7 @@ for await (const event of events.stream) {
 | `file.edited` | File was edited |
 | `todo.updated` | Todo list updated |
 
-> For complete event types, see [5.10b API Reference](./10b-sdk-reference#event-types-complete-list)
+> For complete event types, see [5.10b API Reference](/en/5-advanced/10b-sdk-reference#event-types-complete-list)
 
 ---
 
@@ -518,7 +528,7 @@ async function batchCodeReview(directory: string) {
 
     // Find all TypeScript files
     const files = await client.find.files({
-      query: { query: "*.ts", type: "file", directory },
+      query: { query: "*.ts", directory },
     })
 
     console.log(`Found ${files.data?.length} files`)
@@ -578,12 +588,12 @@ You learned:
 
 ## Related Resources
 
-- [5.10b API Reference](./10b-sdk-reference) - Complete API documentation
-- [5.9 Remote Development](./09a-remote-basics) - HTTP Server details
+- [5.10b API Reference](/en/5-advanced/10b-sdk-reference) - Complete API documentation
+- [5.9 Remote Development](/en/5-advanced/09a-remote-basics) - HTTP Server details
 - [Official SDK Docs](https://opencode.ai/docs/sdk)
 
 ---
 
 ## Next Lesson Preview
 
-> [5.10b API Reference](./10b-sdk-reference) will cover all 21 API modules, complete type definitions, and 35+ event types in detail.
+> [5.10b API Reference](/en/5-advanced/10b-sdk-reference) covers all 20 API modules plus one permission-response method, complete type definitions, and 32 event types in detail.

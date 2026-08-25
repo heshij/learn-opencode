@@ -488,6 +488,8 @@ Chrome DevTools MCP 的工具很多，下面先记这批高频的就够用了：
 OpenCode 会把 MCP 工具注册成“服务器名 + 下划线 + 工具名”的形式。
 
 所以你在配置里把服务器命名为 `chrome-devtools`，最终看到的工具就是 `chrome-devtools_list_pages`、`chrome-devtools_take_snapshot` 这种格式。这样做是为了避免不同 MCP 服务器的工具重名。
+
+`v1.18.22` 已恢复并继续使用这个旧格式。开发过程中短暂出现过 `mcp__chrome-devtools__list_pages` 形式，但它不是目标版本的当前命名，不要据此修改权限规则或提示词。
 :::
 
 ---
@@ -605,17 +607,16 @@ google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile
 <details>
 <summary><strong>点击展开查看源码位置</strong></summary>
 
-> 更新时间：2026-03-15
+> 对应版本：OpenCode v1.18.22
 
 | 功能 | 文件路径 | 行号 |
 |-----|---------|------|
-| MCP 连接入口 | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L328-L531) | 328-531 |
-| Local MCP 启动命令与环境变量 | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L445-L487) | 445-487 |
-| MCP 状态定义（connected / disabled / failed / needs_auth / needs_client_registration） | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L66-L109) | 66-109 |
-| MCP 工具命名规则（服务器名前缀） | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/mcp/index.ts#L603-L643) | 603-643 |
-| `opencode mcp list` 命令 | [`src/cli/cmd/mcp.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/mcp.ts#L67-L136) | 67-136 |
-| `opencode mcp add` 命令 | [`src/cli/cmd/mcp.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/mcp.ts#L418-L579) | 418-579 |
-| MCP 配置 Schema（local / remote / oauth / timeout） | [`src/config/config.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/config/config.ts#L516-L576) | 516-576 |
+| 客户端 capabilities 与 roots | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L38-L80) | 38-80 |
+| Local MCP 的 workspace-relative `cwd` | [`src/mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L340-L357) | 340-357 |
+| MCP 工具命名规则（服务器名前缀） | [`src/mcp/catalog.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/catalog.ts#L117-L119) | 117-119 |
+| 服务器 instructions 注入 | [`src/session/system.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/system.ts#L119-L134) | 119-134 |
+| MCP resources/templates 工具 | [`src/session/tools.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/tools.ts#L27-L31) | 27-31 |
+| MCP 本地/远程配置 Schema | [`src/v1/config/mcp.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/mcp.ts#L6-L23) | 6-23 |
 
 **关键常量**：
 - `DEFAULT_TIMEOUT = 30000`：MCP 连接默认超时时间（30秒）

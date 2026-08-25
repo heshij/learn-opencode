@@ -22,6 +22,7 @@ description: OpenCode 命令行工具完整参考
 | 命令 | 功能 |
 |------|------|
 | `opencode` | 启动 TUI 交互界面 |
+| `opencode --mini` | 启动精简交互界面 |
 | `opencode run` | 非交互模式执行任务 |
 | `opencode serve` | 启动无头服务器 |
 | `opencode web` | 启动 Web 界面 |
@@ -60,6 +61,10 @@ opencode [project]
 | `--prompt` | | 初始提示语 |
 | `--model` | `-m` | 指定模型（格式：provider/model） |
 | `--agent` | | 指定 Agent |
+| `--auto` | | 自动批准未被显式拒绝的权限请求（危险） |
+| `--mini` | | 启动精简交互界面 |
+| `--no-replay` | | Mini 继续会话或终端缩放时不回放历史 |
+| `--replay-limit` | | Mini 最多回放最近 N 条消息 |
 | `--port` | | 监听端口 |
 | `--hostname` | | 监听地址 |
 
@@ -76,7 +81,17 @@ opencode -m anthropic/claude-sonnet-4-20250514
 
 # 继续上次会话
 opencode -c
+
+# 启动 Mini；继续会话时默认回放历史
+opencode --mini -c
+
+# 继续会话但关闭回放
+opencode --mini -c --no-replay
 ```
+
+Mini 是 `opencode --mini`，不是 `opencode run --mini`。在 Mini 输入框开头输入 `!` 可进入 Shell mode；按 <kbd>Esc</kbd> 可直接退出，或在光标位于输入开头时按 <kbd>Backspace</kbd> 退出。
+
+`--auto` 适用于标准 TUI。目标版本仍接受隐藏的 `--yolo` 作为兼容别名，但新脚本应使用公开参数 `--auto`。Mini 入口不会转发这个自动批准开关。
 
 ---
 
@@ -103,6 +118,7 @@ opencode run [message..]
 | `--attach` | | 连接运行中的服务器（如 `http://localhost:4096`） |
 | `--port` | | 本地服务器端口（默认随机） |
 | `--variant` | | 模型变体（推理力度：high、max、minimal） |
+| `--auto` | | 自动批准未被显式拒绝的权限请求（危险） |
 
 **示例**：
 ```bash
@@ -139,7 +155,12 @@ opencode run --title "Bug Fix" "Fix the login issue"
 
 # 从 stdin 读取输入
 echo "Count lines of code" | opencode run "Analyze"
+
+# 非交互执行，并自动批准会触发询问的权限
+opencode run --auto "运行测试并修复失败项"
 ```
+
+`opencode run` 默认是非交互模式。隐藏的 `--yolo` 在目标版本中与 `--auto` 兼容，但不应写入新脚本。两者都只自动批准原本会询问的请求，配置为 `deny` 的规则仍然拒绝执行。
 
 ---
 
@@ -668,3 +689,16 @@ opencode serve --hostname 0.0.0.0
 - [配置选项参考](./config-ref) - 配置文件详解
 - [斜杠命令速查表](./commands) - TUI 内命令
 - [模型提供商列表](./providers) - 可用模型
+
+## 源码参考
+
+以下行为固定参考 [`v1.18.22`](https://github.com/anomalyco/opencode/tree/v1.18.22)：
+
+| 行为 | 源码 | 行号 |
+|------|------|------|
+| `run` 默认非交互、Mini 入口 | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L3-L15) | 3-15 |
+| `--mini`、回放与 `--no-replay` | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L123-L175) | 123-175 |
+| `--auto` 与隐藏兼容别名 | [`packages/opencode/src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run.ts#L242-L274) | 242-274 |
+| 标准 TUI 的自动批准参数 | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L108-L121) | 108-121 |
+| 标准 TUI 的自动批准参数映射 | [`packages/opencode/src/cli/cmd/tui.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/tui.ts#L287-L295) | 287-295 |
+| Mini Shell mode | [`packages/opencode/src/cli/cmd/run/footer.prompt.tsx`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/run/footer.prompt.tsx#L1055-L1094) | 1055-1094 |

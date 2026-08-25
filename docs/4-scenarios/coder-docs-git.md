@@ -169,8 +169,15 @@ AI 修改错了可以撤销。
 /undo
 ```
 
-**你应该看到**：最近一次对话变更被撤销，相关文件改动也会被回滚（需要 Git 仓库）。更多细节见 https://opencode.ai/docs/tui#undo 或 [附录/命令速查](../appendix/commands)。
+**你应该看到**：会话回到上一条用户消息，之后关联的文件补丁也会被回滚（文件恢复需要 Git 仓库）。更多细节见 https://opencode.ai/docs/tui#undo 或 [附录/命令速查](../appendix/commands)。
 
+如果想恢复刚才撤销的会话和文件：
+
+```
+/redo
+```
+
+> `"snapshot": false` 只关闭文件恢复，不会关闭会话的 undo/redo。源码参考：[`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98)、[`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55)。
 
 ### 第 5 步：补充代码注释
 
@@ -344,7 +351,7 @@ Closes #【Issue 编号】
 |-----|-----|-----|
 | README 不准确 | AI 分析不全 | 先用 @explore 让 AI 理解项目 |
 | commit 格式不对 | 没指定规范 | 明确要求 Conventional Commits |
-| /undo 不生效 | 项目不是 Git 仓库 | 先 `git init` |
+| /undo 后消息变了但文件没恢复 | 项目不是 Git 仓库，或设置了 `snapshot: false` | 使用 Git 仓库并启用快照 |
 
 ---
 

@@ -80,23 +80,14 @@ prerequisite:
 
 ### 会话存在哪里？
 
-OpenCode 把会话数据存储在本地文件系统中，按 JSON 文件组织：
+OpenCode 使用 SQLite 保存会话、消息和消息片段。默认数据库位于 OpenCode 数据目录中的 `opencode.db`：
 
 ```
-~/.local/share/opencode/storage/
-├── session/           # 会话信息
-│   └── <project-id>/
-│       └── <session-id>.json
-├── message/           # 消息记录
-│   └── <session-id>/
-│       └── <message-id>.json
-└── part/              # 消息片段（文本、工具调用等）
-    └── <message-id>/
-        └── <part-id>.json
+~/.local/share/opencode/opencode.db
 ```
 
 ::: details 路径说明
-`~/.local/share/opencode/` 是 XDG 标准的数据目录。macOS 和 Linux 都遵循这个规范。会话按项目隔离，不同项目的会话互不干扰。
+示例路径来自 Linux 的 XDG 数据目录。实际位置由系统和环境决定；数据库中的会话仍关联各自项目，不要手工修改数据库文件。
 :::
 
 ### 会话的一生
@@ -288,15 +279,18 @@ Fork 会复制当前会话的所有历史消息，创建一个新会话。新会
 
 **操作方式**：
 
-Fork 没有默认快捷键，你可以在 `opencode.json` 中给它绑一个：
+Fork 没有默认快捷键，你可以在项目的 `tui.json` 或 `tui.jsonc` 中给它绑一个：
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "session_fork": "<leader>f"
   }
 }
 ```
+
+快捷键属于独立 TUI 配置，不要写入主 `opencode.json` / `opencode.jsonc`。源码见 v1.18.22 的 [TUI 快捷键 Schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75)。
 
 配置后，按 <kbd>Ctrl</kbd>+<kbd>X</kbd> <kbd>f</kbd> 就能 Fork 当前会话。
 

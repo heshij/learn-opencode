@@ -1,6 +1,6 @@
 ---
 title: "5.7a MCP Basics"
-subtitle: "Connecting External Services"
+subtitle: "Get Started with External Services"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.7a"
@@ -30,7 +30,7 @@ Key takeaways from this lesson:
 
 ## What You'll Learn
 
-- Understand MCP protocol's role and architecture
+- Understand MCP's role and architecture
 - Configure local MCP servers
 - Configure remote MCP servers
 - Check MCP connection status
@@ -39,9 +39,9 @@ Key takeaways from this lesson:
 
 ## Your Current Challenge
 
-- AI can only operate on local files, cannot access external services
-- Want AI to check Sentry logs, search documentation, operate databases
-- Heard about MCP, but don't know how to configure and use it
+- AI can work with local files but cannot access external services
+- You want AI to inspect Sentry logs, search documentation, or query databases
+- You have heard of MCP but do not know how to configure or use it
 
 ---
 
@@ -85,7 +85,7 @@ It has the highest priority and placing it in the `.opencode/` directory keeps t
 
 ---
 
-## Interactive Adding: opencode mcp add
+## Interactive Setup: opencode mcp add
 
 Don't want to manually edit JSON? Use the interactive command to add MCP:
 
@@ -154,11 +154,36 @@ Configure under `mcp` in `opencode.json` or `.opencode/opencode.json`:
 |--------|------|----------|-------------|
 | `type` | String | ✓ | Must be `"local"` |
 | `command` | Array | ✓ | Command array, e.g., `["npx", "-y", "xxx"]` or `["bun", "x", "xxx"]` |
+| `cwd` | String | | Working directory for the MCP process; relative paths are resolved from the current workspace directory |
 | `environment` | Object | | Environment variable key-value pairs |
 | `enabled` | Boolean | | Whether enabled, defaults to `true` |
 | `timeout` | Number | | Connection timeout (milliseconds), defaults to 30000 |
 
 > ⚠️ **Note**: Official docs describe timeout default as 2000+ms, but actual source code default is 30000ms (30 seconds). Source: `mcp/index.ts:29`
+
+Without `cwd`, a local MCP process uses the current workspace directory directly. A relative path is resolved against the workspace directory; an absolute path is used as-is.
+
+```jsonc
+{
+  "mcp": {
+    "project-tools": {
+      "type": "local",
+      "command": ["npx", "-y", "my-project-mcp"],
+      "cwd": "tools/mcp"
+    }
+  }
+}
+```
+
+Source: [the `cwd` definition for local MCP config](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/mcp.ts#L6-L23) and [workspace-relative resolution](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L340-L357).
+
+### Roots and Capability Negotiation
+
+When connecting to an MCP server, OpenCode declares the `roots` client capability. If the server requests roots, OpenCode returns the `file://` URI for the current workspace directory. This is not another editable setting, and it does not automatically expose arbitrary directories.
+
+What the server can provide is determined by the capabilities it declares. For example, tools are discovered only when the server declares `tools`, and resource-related features appear only when it declares `resources`. Do not assume that a successful connection means the server supports every MCP capability.
+
+Source: [client capabilities](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L38-L50) and [roots response](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/mcp/index.ts#L75-L80).
 
 ### Usage
 
@@ -304,8 +329,8 @@ use the gh_grep tool to search how to implement JWT verification in Node.js
 You learned:
 
 1. **MCP Protocol**: Standard protocol for AI to connect external services
-2. **Configuration Locations**: Project-level vs global-level, team sharing vs personal preference
-3. **Interactive Adding**: `opencode mcp add` command
+2. **Configuration Locations**: Project-level vs. global settings, and team-shared vs. personal preferences
+3. **Interactive Setup**: The `opencode mcp add` command
 4. **Local MCP**: `type: "local"` + `command` array
 5. **Remote MCP**: `type: "remote"` + `url`
 6. **Connection Status**: 5 states and how to check them
@@ -314,7 +339,7 @@ You learned:
 
 ## Next Steps
 
-- [5.7b MCP Advanced](./07b-mcp-advanced) - OAuth authentication, permission management, more MCP examples
+- [5.7b MCP Advanced](/en/5-advanced/07b-mcp-advanced) - OAuth authentication, permission management, more MCP examples
 
 ::: tip Having Issues?
 Stuck on MCP configuration? [Join the community](/en/community) to connect with 2000+ fellow learners and get real-time help.

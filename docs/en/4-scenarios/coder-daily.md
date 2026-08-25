@@ -1,5 +1,5 @@
 ---
-title: "B1 Developer Daily"
+title: "B1 Everyday Development with OpenCode | OpenCode Tutorial"
 subtitle: "Understanding Code, Writing Features, Fixing Bugs"
 course: "OpenCode Practical Course"
 stage: "Stage 4"
@@ -7,11 +7,11 @@ lesson: "B1"
 duration: "20 minutes"
 practice: "25 minutes"
 level: "Advanced"
-description: "Use Plan Agent to understand code, Build Agent to write new features, and AI to locate and fix bugs—boost your development efficiency."
+description: "Learn an OpenCode development workflow: use Plan Agent to understand code, Build Agent to implement features, and AI to diagnose and fix bugs efficiently."
 tags:
-  - Code
-  - Development
-  - Bug Fixing
+  - "Code"
+  - "Development"
+  - "Bug Fixing"
 prerequisite:
   - "3.1 Plan vs Build"
 ---
@@ -74,18 +74,21 @@ Understand Code(Plan) → Plan Solution(Plan) → Implement Feature(Build) → V
 ### Three Common Scenarios
 
 | Scenario | Recommended Agent | Typical Operations |
-|----------|-------------------|-------------------|
+| --- | --- | --- |
 | Understand code | Plan | @file analysis, @explore exploration |
 | Write new feature | Build | Step-by-step implementation, iterative changes |
 | Fix bug | Plan→Build | Analyze root cause first, then fix |
 
-### Syntax Quick Reference (Only 3 Used in This Lesson)
+### Syntax Quick Reference (Only These Four Are Used in This Lesson)
 
 - `@path`: Include file content in the conversation
 - `!command`: Execute command in TUI and include output in the conversation
 - `/undo`: Undo the last conversation change and roll back related file modifications (requires Git repository)
+- `/redo`: Restore the conversation content and related files that were just undone
 
 For detailed syntax, see: https://opencode.ai/docs/tui
+
+> If you set `"snapshot": false` in the main configuration, `/undo` and `/redo` still move the conversation boundary, but they do not restore files. Source references: [`session/revert.ts:38-98`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/session/revert.ts#L38-L98) and [`config.ts:52-55`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L52-L55).
 
 ---
 
@@ -300,7 +303,7 @@ Analyze the bug described by the user, locate possible causes, and provide fix s
 
 - Main Agents (`build` / `plan`): Switch with `Tab`; reverse switch with `Shift+Tab`.
 - Agent List: `<leader>a` (default leader is `ctrl+x`, i.e., press `ctrl+x` then `a`).
-- Sub-session Navigation: `<leader>right` / `<leader>left` / `<leader>up`.
+- Sub-session navigation: `Right` moves to the next child session, `Left` moves to the previous child session, and `Up` returns to the parent session. These three actions use the arrow keys directly by default; you do not press the Leader key first.
 
 For a complete keybinding list: see [5.6b Keybindings](../5-advanced/06b-keybinds).
 
@@ -320,7 +323,7 @@ For a complete keybinding list: see [5.6b Keybindings](../5-advanced/06b-keybind
 ## Common Pitfalls
 
 | Symptom | Cause | Solution |
-|---------|-------|----------|
+| --- | --- | --- |
 | AI starts changing code immediately | In Build Agent | Switch to Plan Agent first for analysis |
 | Feature works but breaks other things | Didn't implement step by step | Confirm after each step before continuing |
 | Bug location inaccurate | Insufficient information | Provide complete error messages and reproduction steps |

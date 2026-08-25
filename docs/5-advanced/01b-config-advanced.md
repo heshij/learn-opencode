@@ -60,14 +60,19 @@ prerequisite:
 
 ### TUI 配置
 
-```json
+TUI 设置使用独立的 `tui.json` 或 `tui.jsonc`，字段直接写在顶层：
+
+```jsonc
 {
-  "tui": {
-    "scroll_speed": 3,
-    "scroll_acceleration": {
-      "enabled": true
-    },
-    "diff_style": "auto"
+  "$schema": "https://opencode.ai/tui.json",
+  "scroll_speed": 3,
+  "scroll_acceleration": {
+    "enabled": true
+  },
+  "diff_style": "auto",
+  "cursor": {
+    "style": "block",
+    "blinking": true
   }
 }
 ```
@@ -77,8 +82,14 @@ prerequisite:
 | `scroll_speed` | 滚动速度倍数（最小 0.001） | 3 |
 | `scroll_acceleration.enabled` | 启用 macOS 风格加速滚动 | false |
 | `diff_style` | 差异显示样式 | `"auto"` |
+| `cursor.style` | 光标形状：`block`、`underline`、`line` 或 `default` | 配置了 `cursor` 时为 `"block"` |
+| `cursor.blinking` | 光标是否闪烁；`style` 为 `default` 时无效 | 配置了 `cursor` 时为 true |
 
 > `scroll_acceleration.enabled` 优先于 `scroll_speed`。启用后会忽略 scroll_speed。
+
+主配置加载器会移除旧的 `theme`、`keybinds` 和 `tui` 字段。启动 TUI 时，迁移器才会检查旧主配置：同目录已有 `tui.json` 就跳过，否则写入新的 `tui.json`，创建或复用 `<原文件>.tui-migration.bak` 后，再从旧主配置删除这三个字段。只有 `tui.jsonc` 不会阻止迁移。
+
+独立 TUI 配置按全局配置、`OPENCODE_TUI_CONFIG`、普通项目配置、沿途 `.opencode`、`OPENCODE_CONFIG_DIR` 的顺序合并，后加载者优先。普通项目文件按根侧到当前目录应用，越近当前目录越优先；多个 `.opencode` 目录按当前侧到根侧合并，因此冲突时更靠根侧者后加载并取胜。`OPENCODE_CONFIG_DIR` 最后加载。
 
 `diff_style` 选项：
 - `"auto"` - 根据终端宽度自适应
@@ -88,8 +99,9 @@ prerequisite:
 
 自定义快捷键：
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "leader": "ctrl+x",
     "session_new": "<leader>n",
@@ -101,14 +113,15 @@ prerequisite:
 }
 ```
 
-> 注意：配置键是 `keybinds`（**复数**！），这与 permission/agent 用单数不同。
+> 注意：配置键是 `keybinds`（**复数**），位于 `tui.json` 顶层。这与主配置中的 permission/agent 用单数不同。
 
 #### Leader 键
 
 大多数快捷键使用 `leader` 键前缀，避免与终端冲突：
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "leader": "ctrl+x"
   }
@@ -119,10 +132,11 @@ prerequisite:
 
 #### 禁用快捷键
 
-将值设为 `"none"` 禁用：
+将值设为 `"none"` 或 `false` 禁用：
 
-```json
+```jsonc
 {
+  "$schema": "https://opencode.ai/tui.json",
   "keybinds": {
     "session_compact": "none"
   }
@@ -138,14 +152,19 @@ prerequisite:
 | `session_list` | `<leader>l` | 会话列表 |
 | `session_interrupt` | `escape` | 中断当前操作 |
 | `session_compact` | `<leader>c` | 压缩会话 |
+| `session_background` | `ctrl+b` | 将同步子 Agent 转到后台 |
 | `model_list` | `<leader>m` | 模型列表 |
 | `agent_list` | `<leader>a` | Agent 列表 |
 | `agent_cycle` | `tab` | 切换 Agent |
 | `command_list` | `ctrl+p` | 命令列表 |
 | `messages_undo` | `<leader>u` | 撤销消息 |
 | `messages_redo` | `<leader>r` | 重做消息 |
+| `diff_open` | `none` | 打开 Diff 查看器（默认未绑定） |
+| `prompt_skills` | `none` | 打开 Skill 选择器（默认未绑定） |
 
-完整快捷键列表见 [速查/快捷键](../appendix/keybinds)。
+常用快捷键列表见 [速查/快捷键](../appendix/keybinds)。
+
+> 源码依据：[TUI 配置 Schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) 和 [扁平快捷键及禁用值](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/keybind.ts#L28-L33)。
 
 ### Server 配置
 
@@ -244,6 +263,33 @@ prerequisite:
 - 复用现有规则文件（如 Cursor 的 rules）
 - 共享团队编码规范
 - monorepo 中引入子项目规则
+
+### References 配置
+
+用 `references` 为项目补充本地目录或 Git 仓库上下文：
+
+```jsonc
+{
+  "references": {
+    "design-system": {
+      "path": "../design-system",
+      "description": "团队组件库和设计规范"
+    },
+    "upstream": {
+      "repository": "https://github.com/example/upstream.git",
+      "branch": "main",
+      "description": "上游实现参考",
+      "hidden": true
+    }
+  }
+}
+```
+
+本地引用使用 `path`，Git 引用使用 `repository`，并可指定 `branch`。带 `description` 的引用会加入系统上下文；`hidden: true` 只会把它从 `@` 自动补全中隐藏。旧的单数键 `reference` 已弃用，请使用 `references`。
+
+> `customize-opencode` 已是默认内置 Skill，用于安全地修改 OpenCode 自身配置，不需要额外安装。此前短暂加入的 Scout 已在目标版本前移除，不应再配置或依赖。
+
+> 源码依据：[references Schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/config/reference.ts#L5-L21)、[主配置键及弃用别名](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L44-L50) 和 [内置 customize-opencode Skill](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/skill/index.ts#L276-L284)。
 
 ---
 
@@ -434,10 +480,10 @@ prerequisite:
 
 | 字段 | 类型 | 说明 |
 |-----|------|------|
-| `temperature` | number | 创造性参数（0-1），越低越确定 |
-| `top_p` | number | 核采样参数（0-1） |
+| `temperature` | 有限 number | 创造性参数；实际可用范围由模型与 Provider 决定 |
+| `top_p` | 有限 number | 核采样参数；实际可用范围由模型与 Provider 决定 |
 | `variant` | string | 默认模型变体（仅在使用该 Agent 配置的模型时生效） |
-| `steps` | number | 最大迭代步数 |
+| `steps` | 正整数 | 最大自动迭代步数；达到上限后输出最终纯文本响应 |
 | `color` | string | 十六进制颜色（如 `#FF5733`）或主题色名（如 `primary`） |
 | `hidden` | boolean | 从 @ 菜单隐藏（仅 subagent 生效） |
 
@@ -631,6 +677,8 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
 
 ## 完整配置示例
 
+主配置 `opencode.jsonc`：
+
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
@@ -663,17 +711,6 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
   
   // === 用户 ===
   "username": "开发者",
-  
-  // === 界面 ===
-  "theme": "catppuccin",
-  "tui": {
-    "scroll_speed": 3,
-    "diff_style": "auto"
-  },
-  "keybinds": {
-    "leader": "ctrl+x",
-    "session_new": "<leader>n"
-  },
   
   // === 服务器 ===
   "server": {
@@ -739,18 +776,33 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
 }
 ```
 
+界面配置 `tui.jsonc`：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "theme": "catppuccin",
+  "scroll_speed": 3,
+  "diff_style": "auto",
+  "keybinds": {
+    "leader": "ctrl+x",
+    "session_new": "<leader>n"
+  }
+}
+```
+
 ---
 
 ## 踩坑提醒
 
 | 现象 | 原因 | 解决 |
 |-----|-----|-----|
-| 用了 `keybind` | 键名错误 | 应为 `keybinds`（**复数**） |
+| 用了 `keybind` | 键名错误 | 在 `tui.json` 中使用 `keybinds`（**复数**） |
 | 用了 `permissions` | 键名错误 | 应为 `permission`（单数） |
 | 用了 `agents` | 键名错误 | 应为 `agent`（单数） |
 | 用了 `commands` | 键名错误 | 应为 `command`（单数） |
 | 用了 `formatters` | 键名错误 | 应为 `formatter`（单数） |
-| 用了 `tui.theme` | 键名错误 | 应直接用 `theme` |
+| 主配置写了 `theme` / `keybinds` / `tui` | 配置文件错误 | 移到同层级的 `tui.json` / `tui.jsonc` |
 | tools 配置不生效 | 遗留配置 | 推荐使用 `permission` |
 | baseURL 不生效 | 位置错误 | 应在 `provider.options.baseURL` 而非顶层 |
 | 模型 API URL 不生效 | 字段错误 | 模型级别用 `provider.api`，Provider 级别用 `options.baseURL` |
@@ -768,8 +820,8 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
 | Agent | `agent` | ~~agents~~ |
 | Command | `command` | ~~commands~~ |
 | Formatter | `formatter` | ~~formatters~~ |
-| **Keybinds** | `keybinds` | ~~keybind~~ |
-| Theme | `theme` | ~~tui.theme~~ |
+| **Keybinds（TUI 配置）** | `keybinds` | ~~keybind~~ |
+| Theme（TUI 配置） | `theme` | ~~tui.theme~~ |
 
 ---
 
@@ -777,9 +829,9 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
 
 你学会了：
 
-1. 界面配置：TUI、快捷键、服务器
+1. 独立的 TUI 界面配置、快捷键，以及主配置中的服务器设置
 2. 行为配置：分享、压缩、监视器、指令文件
-3. 功能配置：Provider、工具、权限、Agent、命令、格式化器、MCP、插件、LSP
+3. 功能配置：Provider、references、工具、权限、Agent、命令、格式化器、MCP、插件、LSP
 4. 实验性功能：批量工具、OpenTelemetry 等
 5. 自定义模型 API URL（v1.1.60+）
 
@@ -792,7 +844,7 @@ Hook 功能通过**插件系统**实现，不是 `experimental` 配置。详见 
 - [5.4 快捷命令](./04-commands) - 命令详细配置
 - [5.5 权限管控](./05-permissions) - 权限详细配置
 - [5.7 MCP 扩展](./07a-mcp-basics) - MCP 详细配置
-- [速查/快捷键](../appendix/keybinds) - 完整快捷键列表
+- [速查/快捷键](../appendix/keybinds) - 常用快捷键列表
 - [速查/配置参考](../appendix/config-ref) - 配置速查表
 
 ---

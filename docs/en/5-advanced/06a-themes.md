@@ -1,13 +1,13 @@
 ---
 title: "5.6a Theme System"
-subtitle: "Customize Your Visual Experience"
+subtitle: "Customize Your Terminal Experience"
 course: "OpenCode Practical Course"
 stage: "Stage 5"
 lesson: "5.6a"
 duration: "10 minutes"
 practice: "10 minutes"
 level: "Advanced"
-description: "Use 50+ built-in themes or customize colors to create a personalized terminal visual experience."
+description: "Use 33 built-in JSON themes, the generated system theme, or custom colors to create a personalized terminal experience."
 tags:
   - "Theme"
   - "Appearance"
@@ -18,7 +18,7 @@ prerequisite:
 
 # 5.6a Theme System
 
-> Switch between 50+ built-in themes, or customize every single color.
+> Switch among 33 built-in JSON themes, with a generated `system` theme when terminal colors are available.
 
 ## 📝 Course Notes
 
@@ -51,14 +51,14 @@ export COLORTERM=truecolor
 
 **Compatibility Notes**:
 - Supported: iTerm2, Alacritty, Kitty, Windows Terminal, GNOME Terminal (newer versions)
-- When truecolor is not supported, themes will degrade to 256-color approximation
+- Without truecolor support, themes fall back to an approximate 256-color palette
 
 ---
 
 ## Switch Themes
 
 ```
-/theme
+/themes
 ```
 
 Or use shortcut: <kbd>Ctrl</kbd>+<kbd>X</kbd> → <kbd>T</kbd>
@@ -67,7 +67,7 @@ Or use shortcut: <kbd>Ctrl</kbd>+<kbd>X</kbd> → <kbd>T</kbd>
 
 ## Built-in Themes
 
-OpenCode includes **32** built-in themes:
+OpenCode includes **33** static JSON themes. When terminal colors are available, it also generates a `system` theme:
 
 | Theme | Style | Source |
 |-----|------|------|
@@ -81,6 +81,7 @@ OpenCode includes **32** built-in themes:
 | `nord` | Dark, Nordic cool tones | [Nord](https://github.com/nordtheme/nord) |
 | `everforest` | Dark, natural green | [Everforest](https://github.com/sainnhe/everforest) |
 | `ayu` | Dark, Ayu style | [Ayu](https://github.com/ayu-theme) |
+| `carbonfox` | Dark, Carbonfox style | Nightfox |
 | `kanagawa` | Dark, Japanese ink painting | [Kanagawa](https://github.com/rebelot/kanagawa.nvim) |
 | `one-dark` | Dark, Atom style | [Atom One](https://github.com/Th3Whit3Wolf/one-nvim) |
 | `dracula` | Dark, purple tones | Dracula |
@@ -105,7 +106,7 @@ OpenCode includes **32** built-in themes:
 | `lucent-orng` | Dark, bright orange tones | OpenCode |
 | `osaka-jade` | Dark, jade green tones | OpenCode |
 
-> Enter `/theme` to preview all themes in real-time.
+> Enter `/themes` to preview all currently available themes in real time.
 
 ---
 
@@ -125,7 +126,7 @@ OpenCode includes **32** built-in themes:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "system"
 }
 ```
@@ -138,12 +139,14 @@ OpenCode includes **32** built-in themes:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "tokyonight"
 }
 ```
 
-> **Note**: The configuration key is `theme`, not `tui.theme`.
+> **Note**: Save this as `tui.json` or `tui.jsonc`. We recommend placing `theme` directly at the top level of the TUI config. Do not put `tui.theme` in the main `opencode.json`; the standalone TUI config remains compatible with the legacy nested form, but you should not continue using it.
+
+When upgrading from an older release, the TUI attempts to migrate `theme` from a legacy main config into a new `tui.json` in the same directory. It skips the migration if that directory already contains `tui.json`; otherwise, it writes the new file successfully and creates or reuses `<original-main-config>.tui-migration.bak` before removing `theme`, `keybinds`, and `tui` from the old main config. Having only `tui.jsonc` does not cause the migration to be skipped.
 
 ---
 
@@ -155,10 +158,9 @@ Priority from low to high (later loaded themes override earlier ones):
 
 1. **Built-in themes** - Embedded in binary file
 2. **User config directory** - `~/.config/opencode/themes/*.json` or `$XDG_CONFIG_HOME/opencode/themes/*.json`
-3. **Project root** - `<project-root>/.opencode/themes/*.json`
-4. **Current working directory** - `./.opencode/themes/*.json`
+3. **`.opencode/themes` directories along the path** - Loaded while walking from the current directory toward its parents
 
-Themes with the same name will be overridden. For example, creating `~/.config/opencode/themes/tokyonight.json` can override the built-in tokyonight theme.
+Themes with the same name override earlier definitions. For example, creating `~/.config/opencode/themes/tokyonight.json` overrides the built-in theme. If multiple `.opencode/themes` directories define the same name, the parent directory is loaded later and wins; do not assume the current directory always has priority.
 
 ### Create Theme
 
@@ -211,7 +213,7 @@ vim .opencode/themes/my-theme.json
 
 ### Complete Theme Properties
 
-Themes contain the following color properties (all require dark/light variants):
+Themes contain the following color properties. Every required property must have a resolvable value, but it does not have to use a `dark`/`light` object: you can provide a single color, a reference, or an ANSI value, or use `{ dark, light }` to configure each mode separately.
 
 **Base Colors**:
 
@@ -295,7 +297,7 @@ Themes contain the following color properties (all require dark/light variants):
 
 ### Complete Example
 
-Using Nord theme as example:
+Using the Nord theme as an example:
 
 ```jsonc
 {
@@ -332,21 +334,19 @@ Besides theme colors, you can also configure TUI behavior:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
-  "tui": {
-    // Scroll speed (minimum 0.001, default 1 on Unix, 3 on Windows)
-    "scroll_speed": 3,
-    
-    // Scroll acceleration (overrides scroll_speed when enabled)
-    "scroll_acceleration": {
-      "enabled": true
-    },
-    
-    // Diff render style
-    // "auto": adapt based on terminal width
-    // "stacked": always single column display
-    "diff_style": "auto"
-  }
+  "$schema": "https://opencode.ai/tui.json",
+  // Scroll speed (minimum 0.001)
+  "scroll_speed": 3,
+
+  // Scroll acceleration (overrides scroll_speed when enabled)
+  "scroll_acceleration": {
+    "enabled": true
+  },
+
+  // Diff rendering style
+  // "auto": adapts to the terminal width
+  // "stacked": always uses a single-column layout
+  "diff_style": "auto"
 }
 ```
 
@@ -354,11 +354,13 @@ Besides theme colors, you can also configure TUI behavior:
 
 | Parameter | Type | Default | Description |
 |------|------|--------|------|
-| `scroll_speed` | number | 1 (Unix) / 3 (Windows) | Scroll speed, minimum 0.001 |
+| `scroll_speed` | number | 3 | Scroll speed, minimum 0.001 |
 | `scroll_acceleration.enabled` | boolean | false | Enable macOS-style scroll acceleration |
 | `diff_style` | `"auto"` \| `"stacked"` | `"auto"` | Diff render style |
 
 > **Note**: When `scroll_acceleration` is enabled, `scroll_speed` setting is ignored.
+
+Like `theme`, all of these fields belong directly at the top level of `tui.json`. See the v1.18.22 [TUI schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75) in the source code.
 
 ---
 
@@ -391,11 +393,11 @@ Or shortcut: <kbd>Ctrl</kbd>+<kbd>X</kbd> → <kbd>E</kbd>
 | Issue | Cause | Solution |
 |-----|-----|-----|
 | Colors display incorrectly/degraded | Terminal doesn't support truecolor | Set `COLORTERM=truecolor` |
-| `/themes` command doesn't exist | Wrong command name | Use `/theme` (no s) |
-| Theme config doesn't work | Used `tui.theme` | Use `theme` directly |
+| `/theme` command doesn't exist | Wrong command name | Use `/themes` (with s) |
+| Theme config doesn't work | It was placed in the main `opencode.json`, or uses the discouraged nested form | Use `theme` at the top level of `tui.json` |
 | Custom theme not loaded | Wrong path | Confirm placed in `.opencode/themes/` or `~/.config/opencode/themes/` |
 | Editor won't open | EDITOR variable incorrect | Confirm editor command is available, add `--wait` for GUI editors |
-| Scrolling too fast/slow | Default speed unsuitable | Adjust `tui.scroll_speed` or enable acceleration |
+| Scrolling too fast/slow | Default speed unsuitable | Adjust top-level `scroll_speed` in `tui.json` or enable acceleration |
 
 ---
 
@@ -403,9 +405,9 @@ Or shortcut: <kbd>Ctrl</kbd>+<kbd>X</kbd> → <kbd>E</kbd>
 
 You learned:
 
-1. Use `/theme` to switch between 32+ built-in themes
+1. Use `/themes` to switch among 33 built-in JSON themes and the generated `system` theme when available
 2. Understand `system` theme's adaptive mechanism
-3. Set `theme` in config to specify default theme
+3. Set `theme` in `tui.json` to specify the default theme
 4. Create custom theme JSON files
 5. Configure TUI scrolling and Diff styles
 6. Set up external editor
@@ -416,4 +418,4 @@ You learned:
 
 > In the next lesson, we'll learn about keyboard shortcut customization.
 
-→ [5.6b Keybinds](./06b-keybinds)
+→ [5.6b Keybindings](/en/5-advanced/06b-keybinds)

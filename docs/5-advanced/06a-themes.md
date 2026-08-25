@@ -7,7 +7,7 @@ lesson: "5.6a"
 duration: 10 分钟
 practice: 10 分钟
 level: 进阶
-description: 使用 50+ 内置主题或自定义颜色，打造个性化的终端视觉体验。
+description: 使用 33 个内置 JSON 主题、自动生成的 system 主题或自定义颜色，打造个性化的终端视觉体验。
 tags:
   - 主题
   - 外观
@@ -18,7 +18,7 @@ prerequisite:
 
 # 5.6a 主题系统
 
-> 50+ 内置主题随意切换，还能自定义每一个颜色。
+> 33 个内置 JSON 主题随意切换，终端可用时还会生成 `system` 主题。
 
 ## 📝 课程笔记
 
@@ -58,7 +58,7 @@ export COLORTERM=truecolor
 ## 切换主题
 
 ```
-/theme
+/themes
 ```
 
 或使用快捷键：<kbd>Ctrl</kbd>+<kbd>X</kbd> → <kbd>T</kbd>
@@ -67,7 +67,7 @@ export COLORTERM=truecolor
 
 ## 内置主题
 
-OpenCode 内置 **32** 个主题：
+OpenCode 内置 **33** 个静态 JSON 主题。终端颜色可用时，还会额外生成一个 `system` 主题：
 
 | 主题 | 风格 | 来源 |
 |-----|------|------|
@@ -81,6 +81,7 @@ OpenCode 内置 **32** 个主题：
 | `nord` | 暗色，北欧冷调 | [Nord](https://github.com/nordtheme/nord) |
 | `everforest` | 暗色，自然绿 | [Everforest](https://github.com/sainnhe/everforest) |
 | `ayu` | 暗色，Ayu 风格 | [Ayu](https://github.com/ayu-theme) |
+| `carbonfox` | 暗色，Carbonfox 风格 | Nightfox |
 | `kanagawa` | 暗色，日式水墨 | [Kanagawa](https://github.com/rebelot/kanagawa.nvim) |
 | `one-dark` | 暗色，Atom 风格 | [Atom One](https://github.com/Th3Whit3Wolf/one-nvim) |
 | `dracula` | 暗色，紫色调 | Dracula |
@@ -105,7 +106,7 @@ OpenCode 内置 **32** 个主题：
 | `lucent-orng` | 暗色，明亮橙色调 | OpenCode |
 | `osaka-jade` | 暗色，翡翠绿调 | OpenCode |
 
-> 输入 `/theme` 可实时预览所有主题效果。
+> 输入 `/themes` 可实时预览当前可用的主题效果。
 
 ---
 
@@ -125,7 +126,7 @@ OpenCode 内置 **32** 个主题：
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "system"
 }
 ```
@@ -138,12 +139,14 @@ OpenCode 内置 **32** 个主题：
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai/tui.json",
   "theme": "tokyonight"
 }
 ```
 
-> **注意**：配置键是 `theme`，不是 `tui.theme`。
+> **注意**：把这段保存为 `tui.json` 或 `tui.jsonc`。推荐把 `theme` 直接写在 TUI 配置顶层。不要把 `tui.theme` 写进主 `opencode.json`；独立 TUI 配置仍兼容嵌套的旧写法，但不推荐继续使用。
+
+从旧版本升级时，启动 TUI 会尝试把旧主配置中的 `theme` 迁到同目录的新 `tui.json`。同目录已有 `tui.json` 时会跳过；否则成功写入新文件并创建或复用 `<原主配置>.tui-migration.bak` 后，才从旧主配置删除 `theme`、`keybinds` 和 `tui`。只有 `tui.jsonc` 不会触发跳过。
 
 ---
 
@@ -155,10 +158,9 @@ OpenCode 内置 **32** 个主题：
 
 1. **内置主题** - 嵌入二进制文件中
 2. **用户配置目录** - `~/.config/opencode/themes/*.json` 或 `$XDG_CONFIG_HOME/opencode/themes/*.json`
-3. **项目根目录** - `<project-root>/.opencode/themes/*.json`
-4. **当前工作目录** - `./.opencode/themes/*.json`
+3. **沿途 `.opencode/themes`** - 从当前目录向父目录遍历并加载
 
-同名主题会被覆盖。例如创建 `~/.config/opencode/themes/tokyonight.json` 可以覆盖内置的 tokyonight 主题。
+同名主题会被覆盖。例如创建 `~/.config/opencode/themes/tokyonight.json` 可以覆盖内置主题。多个沿途 `.opencode/themes` 定义同名主题时，更靠父级的目录后加载并取胜，不要假设当前目录一定优先。
 
 ### 创建主题
 
@@ -211,7 +213,7 @@ vim .opencode/themes/my-theme.json
 
 ### 完整主题属性
 
-主题包含以下颜色属性（均需提供 dark/light 变体）：
+主题包含以下颜色属性。每个必填属性都要提供可解析的值，但不强制使用 `dark/light` 对象：可以直接写单色、引用或 ANSI 值，也可以用 `{ dark, light }` 分别设置两种模式。
 
 **基础颜色**：
 
@@ -332,21 +334,19 @@ vim .opencode/themes/my-theme.json
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
-  "tui": {
-    // 滚动速度（最小 0.001，默认 Unix 为 1，Windows 为 3）
-    "scroll_speed": 3,
-    
-    // 滚动加速度（启用后覆盖 scroll_speed）
-    "scroll_acceleration": {
-      "enabled": true
-    },
-    
-    // Diff 渲染样式
-    // "auto": 根据终端宽度自适应
-    // "stacked": 始终单列显示
-    "diff_style": "auto"
-  }
+  "$schema": "https://opencode.ai/tui.json",
+  // 滚动速度（最小 0.001）
+  "scroll_speed": 3,
+
+  // 滚动加速度（启用后覆盖 scroll_speed）
+  "scroll_acceleration": {
+    "enabled": true
+  },
+
+  // Diff 渲染样式
+  // "auto": 根据终端宽度自适应
+  // "stacked": 始终单列显示
+  "diff_style": "auto"
 }
 ```
 
@@ -354,11 +354,13 @@ vim .opencode/themes/my-theme.json
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `scroll_speed` | number | 1 (Unix) / 3 (Windows) | 滚动速度，最小 0.001 |
+| `scroll_speed` | number | 3 | 滚动速度，最小 0.001 |
 | `scroll_acceleration.enabled` | boolean | false | 启用 macOS 风格滚动加速 |
 | `diff_style` | `"auto"` \| `"stacked"` | `"auto"` | Diff 渲染样式 |
 
 > **注意**：启用 `scroll_acceleration` 后，`scroll_speed` 设置将被忽略。
+
+以上字段与 `theme` 一样，都直接写在 `tui.json` 顶层。源码见 v1.18.22 的 [TUI Schema](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/tui/src/config/index.tsx#L61-L75)。
 
 ---
 
@@ -391,11 +393,11 @@ export EDITOR="nano"         # Nano
 | 现象 | 原因 | 解决 |
 |-----|-----|-----|
 | 颜色显示不对/降级 | 终端不支持 truecolor | 设置 `COLORTERM=truecolor` |
-| `/themes` 命令不存在 | 命令名错了 | 使用 `/theme`（无 s） |
-| 主题配置不生效 | 用了 `tui.theme` | 应直接用 `theme` |
+| `/theme` 命令不存在 | 命令名错了 | 使用 `/themes`（有 s） |
+| 主题配置不生效 | 写进了主 `opencode.json`，或沿用不推荐的嵌套写法 | 在 `tui.json` 顶层使用 `theme` |
 | 自定义主题没加载 | 路径不对 | 确认放在 `.opencode/themes/` 或 `~/.config/opencode/themes/` |
 | 编辑器打不开 | EDITOR 变量不对 | 确认编辑器命令可用，GUI 编辑器加 `--wait` |
-| 滚动太快/太慢 | 默认速度不合适 | 调整 `tui.scroll_speed` 或启用加速 |
+| 滚动太快/太慢 | 默认速度不合适 | 调整 `tui.json` 顶层的 `scroll_speed` 或启用加速 |
 
 ---
 
@@ -403,9 +405,9 @@ export EDITOR="nano"         # Nano
 
 你学会了：
 
-1. 使用 `/theme` 切换 32+ 内置主题
+1. 使用 `/themes` 切换 33 个内置 JSON 主题和可用时生成的 `system` 主题
 2. 理解 `system` 主题的自适应机制
-3. 在配置中设置 `theme` 指定默认主题
+3. 在 `tui.json` 中设置 `theme` 指定默认主题
 4. 创建自定义主题 JSON 文件
 5. 配置 TUI 滚动和 Diff 样式
 6. 设置外部编辑器

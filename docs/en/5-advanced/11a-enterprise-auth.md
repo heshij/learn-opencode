@@ -7,7 +7,7 @@ lesson: "5.11a"
 duration: "30 minutes"
 practice: "35 minutes"
 level: "Advanced"
-description: "Connect company unified authentication, inject tokens saved during login into OpenCode process environment variables, and distribute organization default configurations (short-term token renewal via plugins)."
+description: "Connect company-wide authentication, inject saved login tokens into the configuration substitution map, and distribute organization defaults (with plugins renewing short-lived tokens)."
 tags:
   - "Enterprise"
   - "Authentication"
@@ -38,7 +38,7 @@ This lesson gives you 3 paths (from simplest to most flexible):
 
 1) Environment Variables: You inject the Token yourselves, OpenCode just reads it
 
-2) well-known: Execute `auth.command` once during login to save the token; subsequent startups only inject the saved token + fetch organization default configs (no auto-renewal)
+2) well-known: Run `auth.command` once at login to save the token; subsequent startups inject the saved token and load either the embedded `config` or the standalone JSON referenced by `remote_config` (no automatic renewal)
 
 3) Authentication Plugin: When you need OAuth/refresh/signing/modifying headers/params, implement via plugin
 
@@ -77,7 +77,7 @@ This lesson gives you 3 paths (from simplest to most flexible):
 
 ## 🎒 Before You Start
 
-- [ ] Read [5.1 Configuration Deep Dive](./01a-config-basics)
+- [ ] Read [5.1 Configuration Deep Dive](/en/5-advanced/01a-config-basics)
 - [ ] Prepare an internal domain, e.g., `https://ai.company.internal`
 - [ ] Prepare a command to get a Token (recommended non-interactive: outputs token directly to stdout, doesn't depend on stdin interaction)
 
@@ -93,8 +93,8 @@ The goal of this lesson is: automatically put this string into an environment va
 
 OpenCode has an entry point well-suited for enterprise intranets: `opencode auth login <url>`.
 
-- It requests `<url>/.well-known/opencode`, reads `auth.command` and `auth.env`, then executes `auth.command` locally to get and save the Token (source: `packages/opencode/src/cli/cmd/auth.ts`).
-- When OpenCode starts and loads config, if it finds a saved `type: "wellknown"` credential, it sets `process.env[auth.env]=token` at runtime, and merges the `config` from `<url>/.well-known/opencode` as "organization default configuration" (source: `packages/opencode/src/config/config.ts`).
+- It requests `<url>/.well-known/opencode`, reads `auth.command` and `auth.env`, then runs `auth.command` locally to retrieve and save the token (source: [`providers.ts:325-350`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/providers.ts#L325-L350)).
+- When OpenCode loads its configuration, a saved `type: "wellknown"` credential causes the token to be placed in an environment map used only for configuration-variable substitution, and the `config` from `<url>/.well-known/opencode` is merged. If the response includes `remote_config`, OpenCode also fetches the standalone JSON at its `url`; fields in the remote JSON override the embedded `config` (source: [`config.ts:356-393`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L393)).
 
 The 3 most common enterprise integration methods (from least to most code changes):
 
@@ -107,12 +107,13 @@ The 3 most common enterprise integration methods (from least to most code change
 
 OpenCode defines an endpoint for enterprise scenarios: `/.well-known/opencode`.
 
-It returns a JSON, typically containing two parts:
+It returns JSON that typically contains:
 
 - `auth`: Tells OpenCode what command to use to get the Token (`auth.command`), and which environment variable to inject the Token into (`auth.env`)
-- `config`: Organization default configuration (merged into OpenCode's configuration system)
+- `config`: Organization defaults embedded directly in the response
+- `remote_config`: Optional. Uses `{ "url": "...", "headers": { ... } }` to reference a standalone configuration JSON; the URL and header values support configuration-variable substitution
 
-Note: OpenCode directly runs `auth.command` (source: `packages/opencode/src/cli/cmd/auth.ts`). It also fetches and merges `config` on startup (source: `packages/opencode/src/config/config.ts`).
+Note: OpenCode runs `auth.command` directly and fetches and merges `config` / `remote_config` at startup. Trust only enterprise domains you control.
 
 If `config` contains `plugin`, OpenCode may automatically install the plugin package and `import()` it (source: `packages/opencode/src/plugin/index.ts`).
 
@@ -120,11 +121,11 @@ Simply put: treat `/.well-known/opencode` as "the configuration entry point dist
 :::
 
 ::: details 📦 well-known Distributes "Default Values", Not "Enforced Policies"
-OpenCode's configuration merge order (low → high) is:
+The OpenCode v1 loader merges configuration in this order (low → high):
 
 1) Remote `/.well-known/opencode` (organization defaults)
 
-2) Global config (`~/.config/opencode/{config.json,opencode.json,opencode.jsonc}`)
+2) Global configuration (legacy `config.json`, then `opencode.json`, then `opencode.jsonc`; newly created global configuration defaults to `opencode.jsonc`)
 
 3) Custom config path (`OPENCODE_CONFIG`)
 
@@ -132,11 +133,13 @@ OpenCode's configuration merge order (low → high) is:
 
 5) `.opencode/` directory config (including `.opencode/opencode.json{,c}` and `.opencode/plugin/`, etc.)
 
-5.1) You can also use `OPENCODE_CONFIG_DIR` to specify an additional config directory (it will be loaded as part of directory sources, source: `packages/opencode/src/config/config.ts`)
+5.1) You can also use `OPENCODE_CONFIG_DIR` to specify an additional configuration directory, which is loaded as one of the directory sources
 
 6) Inline config (`OPENCODE_CONFIG_CONTENT`)
 
-(Enterprise Edition) managed config directory overrides all above sources (source comment: `packages/opencode/src/config/config.ts`).
+(Enterprise Edition) The managed-configuration directory overrides every source above.
+
+`remote_config` and the embedded `wellknown.config` are loaded before global, project, and `.opencode/` configuration, so they provide organization defaults that later local sources can still override. See [`config.ts:356-429`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L429) for the implementation; the final managed-configuration merge is at [`config.ts:525-534`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L525-L534).
 
 So `wellknown.config` is better suited for "team default out-of-box experience".
 
@@ -225,6 +228,8 @@ well-known's `auth.command` only runs once when you execute `opencode auth login
 On subsequent OpenCode startups, it only injects this "saved token", no auto-refresh/renewal.
 
 If your tokens are very short-lived (e.g., 1 hour expiration), Method C is more suitable: use a plugin to implement refresh/signing flow.
+
+If an SSO-protected well-known endpoint or `remote_config` returns an HTML login page instead of JSON, OpenCode recognizes it as missing or expired authentication and prompts you to run `opencode auth login <url>` again. The URL-based login path for that command does not first load the project instance that uses the old token, so reauthentication can proceed directly.
 :::
 
 <img src="/images/5-advanced/11a-auth-wellknown-flow.mini.jpeg"
@@ -244,6 +249,16 @@ Here's a minimal working example (you need to return this at `https://ai.company
     "command": ["corpctl", "ai", "token", "--format=plain"],
     "env": "COMPANY_AI_TOKEN"
   },
+
+  // Optional: host organization configuration in a separate service.
+  // The remote JSON overrides fields of the same name in config below.
+  "remote_config": {
+    "url": "https://config.company.internal/opencode.json",
+    "headers": {
+      "Authorization": "Bearer {env:COMPANY_AI_TOKEN}"
+    }
+  },
+
   "config": {
     "$schema": "https://opencode.ai/config.json",
 
@@ -254,9 +269,11 @@ Here's a minimal working example (you need to return this at `https://ai.company
     "provider": {
       "corp-gateway": {
         "name": "Company AI Gateway",
-        "env": ["COMPANY_AI_TOKEN"],
         "api": "https://ai-gateway.company.internal/v1",
         "npm": "@ai-sdk/openai-compatible",
+        "options": {
+          "apiKey": "{env:COMPANY_AI_TOKEN}"
+        },
         "models": {
           "qwen2.5-72b": {
             "name": "Qwen 2.5 72B",
@@ -279,13 +296,13 @@ Here's a minimal working example (you need to return this at `https://ai.company
 
 ::: warning ⚠️ Key Points
 - `auth.command` must be runnable on development machines/containers; its stdout will be treated as the Token.
-- `auth.env` is the environment variable name. When OpenCode starts, it sets `process.env[auth.env]=token` in the current process (not equivalent to writing to your system's global environment variables).
+- `auth.env` is the configuration-variable name. At startup, OpenCode places the saved token in a virtual environment map for the current configuration load so that `{env:COMPANY_AI_TOKEN}` can be substituted. It does not modify `process.env` for the current process or the system shell.
 :::
 
 #### 3.2 Use `opencode auth login` to Save Credentials Locally
 
 **Why**  
-This step saves a `type: "wellknown"` credential to the local `auth.json`. After this, every OpenCode startup will automatically inject the environment variable and fetch remote `config`.
+This step saves a `type: "wellknown"` credential to the local `auth.json`. On each subsequent startup, OpenCode makes the token available for configuration-variable substitution and fetches the remote `config` / `remote_config`.
 
 ```bash
 opencode auth login https://ai.company.internal
@@ -322,6 +339,12 @@ opencode run -m corp-gateway/qwen2.5-72b "Explain the key points of this text in
 
 **Why**  
 When you're not just "running a command to output Token", but need OAuth, auto-refresh, request signing, dynamic header/param modification, plugins are the most reliable solution.
+
+::: info Boundary between v1 provider authentication and the v2 connector
+The current compatibility interface still declares `api` or `oauth` methods through the plugin's `auth.methods`. `oauth` can use either an automatic callback or manual authorization-code entry, and `loader` then converts saved credentials into provider configuration. See the type definitions at [`packages/plugin/src/index.ts:88-180`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/index.ts#L88-L180).
+
+`v1.18.22` also provides a v2 integration connector. An integration can register `key`, `env`, and `oauth` methods; the connection layer saves and resolves credentials and can invoke `refresh` when OAuth credentials are close to expiring. This is the v2 plugin interface—do not mix `context.integration` examples directly into the v1 `Plugin` skeleton below. See [`packages/plugin/src/v2/effect/integration.ts:15-62`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/effect/integration.ts#L15-L62) for the interface and [`packages/core/src/integration.ts:380-457`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/integration.ts#L380-L457) for the connection and refresh flow.
+:::
 
 #### 4.1 Write an Authentication Plugin Skeleton
 
@@ -406,10 +429,11 @@ opencode auth login
 
 | Symptom | Cause | Solution |
 |---|---|---|
-| After login, `echo $COMPANY_AI_TOKEN` shows no value in another terminal | well-known's token is written to `process.env` of the current process when OpenCode starts, not to your `.zshrc/.bashrc` | Doesn't affect OpenCode model calls; verify with `opencode run -m corp-gateway/...`; if you really need to see it in shell, `export COMPANY_AI_TOKEN=...` yourself |
+| After login, `echo $COMPANY_AI_TOKEN` shows no value in another terminal | The well-known token is placed only in the configuration-variable substitution map; it is not written to `process.env` or your `.zshrc/.bashrc` | Use `options.apiKey: "{env:COMPANY_AI_TOKEN}"` in the provider configuration and verify with `opencode run -m corp-gateway/...` |
 | `opencode auth login` directly returns 404/2000+ | `/.well-known/opencode` unreachable | First verify URL is accessible via browser/curl |
 | Shows `Failed` / No `Logged into ...` | `auth.command` exit code is not 0 | Ensure command runs on current machine, and stdout outputs Token |
-| OpenCode exits with error on startup | Remote well-known fetch failure throws error, interrupts config loading | First ensure `<url>/.well-known/opencode` is reachable; for debugging, use `opencode auth logout` to remove this URL credential before starting |
+| OpenCode reports that remote configuration returned a login page | The well-known endpoint or `remote_config` is behind SSO, and the saved token is missing or expired | Follow the error message and run `opencode auth login <url>` to authenticate again |
+| OpenCode reports another remote-configuration error at startup | The well-known endpoint / `remote_config` is unreachable, returns non-JSON content, or contains invalid configuration | Check the remote endpoint and JSON; if necessary, use `opencode auth logout` to remove the URL credential before troubleshooting |
 | `opencode auth login` can't find your provider | Your provider is not in models.dev list | Select `Other`, manually enter provider id (e.g., `corp-gateway`) |
 | Login succeeds but config doesn't take effect | Only Token saved, no `config` returned | Add `config` field to well-known JSON |
 | Can login in container but not locally (or vice versa) | Command/certificate chain differences | Ensure both container and local machine have company root certificates installed, and `auth.command` works on both |
@@ -433,7 +457,7 @@ You learned:
 
 > The next lesson will make authentication and gateway capabilities more flexible: after learning the plugin system, you can write truly "enterprise-grade" custom login flows and request rewrites.
 >
-> Next: **[5.12a Plugin Basics](./12a-plugins-basics)**.
+> Next: **[5.12a Plugin Basics](/en/5-advanced/12a-plugins-basics)**.
 
 ---
 
@@ -442,16 +466,18 @@ You learned:
 <details>
 <summary><strong>Click to expand source code locations</strong></summary>
 
-> Last updated: 2026-02-05
+> Baseline version: OpenCode `v1.18.22`
 
 | Feature | File Path | Lines |
 |---|---|---|
-| `opencode auth login <url>`: fetch `/.well-known/opencode` and execute `auth.command`, save `type: wellknown` credential | [`src/cli/cmd/auth.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/auth.ts#L231-L252) | 231-252 |
-| Load well-known on startup: write token to `auth.env` environment variable, merge remote `config` | [`src/config/config.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/config/config.ts#L62-L91) | 62-91 |
-| Auth info storage structure (oauth/api/wellknown) and `auth.json` write logic | [`src/auth/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/auth/index.ts#L7-L69) | 7-69 |
-| Plugin auth hook `auth` type definition (`methods`/`loader`) | [`packages/plugin/src/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/index.ts#L37-L156) | 37-156 |
-| OpenCode plugin loading mechanism (built-in plugins + plugin list from config) | [`src/plugin/index.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/plugin/index.ts#L15-L90) | 15-90 |
-| `opencode run` command parameters (`-m provider/model`) | [`src/cli/cmd/run.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/cli/cmd/run.ts#L28-L94) | 28-94 |
+| `config` / `remote_config` schema for well-known | [`packages/core/src/v1/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/core/src/v1/config/config.ts#L22-L25) | 22-25 |
+| URL login: run `auth.command` and save the well-known credential | [`packages/opencode/src/cli/cmd/providers.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/cmd/providers.ts#L325-L350) | 325-350 |
+| Variable substitution in the `remote_config` URL and headers | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L64-L98) | 64-98 |
+| Loading well-known remote configuration and merge order | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L356-L429) | 356-429 |
+| Prompt to reauthenticate when remote configuration returns a login page | [`packages/opencode/src/cli/error.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/cli/error.ts#L97-L106) | 97-106 |
+| Legacy global-config compatibility and default `opencode.jsonc` | [`packages/opencode/src/config/config.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/opencode/src/config/config.ts#L139-L147) | 139-147 |
+| Plugin authentication hook `auth` type definitions (`methods` / `loader`) | [`packages/plugin/src/index.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/index.ts#L88-L180) | 88-180 |
+| v2 integration connector methods and connection interface | [`packages/plugin/src/v2/effect/integration.ts`](https://github.com/anomalyco/opencode/blob/v1.18.22/packages/plugin/src/v2/effect/integration.ts#L15-L62) | 15-62 |
 
 **Key Types**:
 - `Auth.WellKnown`: `{ type: "wellknown", key: string, token: string }`
